@@ -78,8 +78,24 @@ Your task is to modify the code so that the issue below is resolved and all rele
    - Use `check_syntax(file_path)` to validate Python syntax
    - Run tests with `run_test()` to verify the fix
 
-5. **Complete the Task**
-   - Only call `finish()` after verifying changes exist
+5. **Testing Requirements (CRITICAL)**
+   - **You MUST run the specific test mentioned in the issue before finishing**
+     - Use `find_test_file(issue_description)` to locate the test
+     - Run it with `run_test(test_path, test_name)` to verify your fix works
+   - **Run related tests to check for regressions**
+     - Look for other tests in the same file/module using `grep()` or `find_files()`
+     - Run tests for related functionality
+   - **Handle edge cases mentioned in the issue**
+     - Read the issue description carefully for all scenarios
+     - Ensure your fix addresses all cases mentioned
+     - Test edge cases explicitly if possible
+   - **Verify the fix is complete**
+     - If the issue mentions multiple cases, test all of them
+     - If the issue mentions specific error conditions, verify they're handled
+     - Only call `finish()` after tests pass
+
+6. **Complete the Task**
+   - Only call `finish()` after verifying changes exist AND tests pass
    - The `finish()` result parameter is for logging only
    - Actual patch is generated automatically from file edits via git
 
@@ -87,9 +103,10 @@ Your task is to modify the code so that the issue below is resolved and all rele
 
 - **You MUST use `replace_in_file()` to make actual code changes**
 - **You MUST verify changes exist before calling `finish()`**
+- **You MUST run tests before finishing to ensure your fix works**
 - **Text descriptions in `finish()` do NOT create patches - only file edits do**
 - **If `verify_changes()` shows no changes, you haven't fixed the issue**
-- **Always run tests before finishing to ensure your fix works**
+- **If tests fail, debug and fix before finishing**
 
 ## Common Fix Patterns
 

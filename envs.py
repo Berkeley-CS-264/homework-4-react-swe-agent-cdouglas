@@ -122,6 +122,9 @@ class SWEEnvironment:
         Returns:
             Confirmation message with the number of lines replaced
         """
+        import tempfile
+        import os
+
         try:
             # Use Python to safely replace lines in the file
             # We'll use base64 encoding to safely pass the content through the command line
@@ -198,7 +201,20 @@ except Exception as e:
     print(f"Error writing file: {{e}}", file=sys.stderr)
     sys.exit(1)
 """
-            output = self.env.execute(f"python3 -c {repr(python_script)}")
+            # Write script to temporary file to avoid shell escaping issues
+            # This fixes the critical bug where repr() caused bash syntax errors
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+                f.write(python_script)
+                temp_script = f.name
+
+            try:
+                output = self.env.execute(f"python3 {temp_script}")
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_script)
+                except:
+                    pass
 
             # Handle case where execute returns a dict instead of string
             if isinstance(output, dict):
