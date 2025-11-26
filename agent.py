@@ -69,6 +69,8 @@ Your task is to modify the code so that the issue below is resolved and all rele
 3. **Make Changes**
    - Use `replace_in_file(file_path, from_line, to_line, content)` to modify code
    - Line numbers are 1-indexed and inclusive (both from_line and to_line are included)
+   - **Tools are tolerant**: File paths are auto-normalized (whitespace removed, ./ prefix handled)
+   - **Line numbers are auto-corrected**: If to_line < from_line, they are swapped automatically
    - Make minimal, targeted changes
    - Preserve existing code style and patterns
 

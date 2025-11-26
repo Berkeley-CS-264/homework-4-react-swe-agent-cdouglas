@@ -441,6 +441,168 @@ if isinstance(other, Mul):
             result = self.env_wrapper.check_syntax("modified_file.py")
             self.assertEqual("Syntax OK", result)
 
+    # Tests for tool misuse and failure scenarios
+
+    def test_replace_in_file_wrong_line_order(self):
+        """Test replace_in_file() auto-corrects when to_line < from_line."""
+        # Common agent mistake: swapping line numbers
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write("line1\nline2\nline3\n")
+            temp_file = f.name
+
+        try:
+            self.mock_env.files[temp_file] = "line1\nline2\nline3\n"
+            # Agent mistakenly passes to_line < from_line
+            result = self.env_wrapper.replace_in_file(temp_file, 3, 1, "new content\n")
+            # Should auto-correct and succeed
+            self.assertIn("Successfully replaced", result)
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_replace_in_file_normalizes_path(self):
+        """Test replace_in_file() normalizes file paths (removes ./ prefix)."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write("test\n")
+            temp_file = f.name
+
+        try:
+            self.mock_env.files[temp_file] = "test\n"
+            # Agent adds ./ prefix (common mistake)
+            result = self.env_wrapper.replace_in_file(f"./{temp_file}", 1, 1, "new\n")
+            self.assertIn("Successfully replaced", result)
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_show_file_normalizes_path(self):
+        """Test show_file() normalizes file paths."""
+        self.mock_env.files["test.py"] = "content"
+        # Agent adds ./ prefix
+        result = self.env_wrapper.show_file("./test.py")
+        self.assertIn("content", result)
+
+    def test_show_file_not_found_helpful_message(self):
+        """Test show_file() provides helpful error when file not found."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=ValueError("No such file")):
+            result = self.env_wrapper.show_file("nonexistent.py")
+            self.assertIn("not found", result)
+            self.assertIn("find_files", result)
+
+    def test_run_test_normalizes_path(self):
+        """Test run_test() normalizes test paths."""
+        # Agent might pass "./tests/test.py" or "tests/test.py.py"
+        with patch.object(self.env_wrapper.env, 'execute', return_value="PASSED"):
+            result = self.env_wrapper.run_test("./tests/test.py")
+            self.assertIn("PASSED", result)
+
+            # Test removing .py extension
+            result = self.env_wrapper.run_test("tests/test.py")
+            self.assertIn("PASSED", result)
+
+    def test_run_test_verbose_string_input(self):
+        """Test run_test() accepts string for verbose flag."""
+        # Agent might pass "true" instead of True
+        with patch.object(self.env_wrapper.env, 'execute', return_value="PASSED"):
+            result = self.env_wrapper.run_test("test.py", verbose="true")
+            self.assertIn("PASSED", result)
+
+            result = self.env_wrapper.run_test("test.py", verbose="false")
+            self.assertIn("PASSED", result)
+
+    def test_check_syntax_normalizes_path(self):
+        """Test check_syntax() normalizes file paths."""
+        with patch.object(self.env_wrapper.env, 'execute', return_value=""):
+            result = self.env_wrapper.check_syntax("./test.py")
+            self.assertEqual("Syntax OK", result)
+
+    def test_show_diff_no_file_shows_all(self):
+        """Test show_diff() works without file_path to show all changes."""
+        self.mock_env.execute = Mock(return_value="diff --git a/test.py b/test.py")
+        result = self.env_wrapper.show_diff()
+        self.assertIn("diff --git", result)
+
+    def test_verify_changes_no_changes(self):
+        """Test verify_changes() when no changes exist (common failure scenario)."""
+        # This is a critical test - agent should check this before finishing
+        with patch.object(self.env_wrapper.env, 'execute', return_value=""):
+            result = self.env_wrapper.verify_changes()
+            self.assertEqual("No changes detected", result)
+            # Agent should NOT call finish() if this returns "No changes detected"
+
+    def test_replace_in_file_invalid_line_numbers(self):
+        """Test replace_in_file() handles invalid line number types."""
+        # Agent might pass strings instead of ints
+        with self.assertRaises(ValueError) as cm:
+            self.env_wrapper.replace_in_file("test.py", "one", "two", "content")
+        self.assertIn("integers", str(cm.exception).lower())
+
+    def test_replace_in_file_negative_line_numbers(self):
+        """Test replace_in_file() auto-corrects negative line numbers."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write("line1\n")
+            temp_file = f.name
+
+        try:
+            self.mock_env.files[temp_file] = "line1\n"
+            # Agent mistakenly passes negative line numbers
+            result = self.env_wrapper.replace_in_file(temp_file, -1, 0, "new\n")
+            # Should auto-correct to 1, 1
+            self.assertIn("Successfully replaced", result)
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_analyze_test_failure_various_errors(self):
+        """Test analyze_test_failure() handles various error types."""
+        # Test AssertionError
+        failure1 = "test.py::test_func FAILED\nAssertionError: assert 1 == 2"
+        result = self.env_wrapper.analyze_test_failure(failure1)
+        self.assertIn("AssertionError", result)
+
+        # Test ValueError
+        failure2 = "test.py::test_func FAILED\nValueError: invalid value"
+        result = self.env_wrapper.analyze_test_failure(failure2)
+        self.assertIn("ValueError", result)
+
+        # Test TypeError
+        failure3 = "test.py::test_func FAILED\nTypeError: unsupported operand"
+        result = self.env_wrapper.analyze_test_failure(failure3)
+        self.assertIn("TypeError", result)
+
+    def test_find_test_file_with_keywords(self):
+        """Test find_test_file() matches keywords from issue description."""
+        # Simulate finding test files
+        self.mock_env.execute = Mock(return_value="./tests/test_inherit.py\n./tests/test_docstrings.py")
+        result = self.env_wrapper.find_test_file("inherit docstrings functionality")
+        self.assertIn("test_inherit", result)
+
+    def test_generate_patch_no_changes_returns_empty(self):
+        """Test generate_patch() returns empty string when no changes (not error text).
+
+        This verifies the fix for the bug where invalid patches were returned.
+        """
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=lambda cmd: "" if "diff" in cmd else ""):
+            result = self.env_wrapper.generate_patch("test")
+            # Should return empty string, not error description
+            self.assertEqual("", result)
+            self.assertNotIn("No changes detected", result)
+
+    def test_tool_tolerance_whitespace(self):
+        """Test tools tolerate leading/trailing whitespace in paths."""
+        self.mock_env.files["test.py"] = "content"
+
+        # Test show_file with whitespace
+        result = self.env_wrapper.show_file("  test.py  ")
+        self.assertIn("content", result)
+
+        # Test check_syntax with whitespace
+        with patch.object(self.env_wrapper.env, 'execute', return_value=""):
+            result = self.env_wrapper.check_syntax("  test.py  ")
+            self.assertEqual("Syntax OK", result)
+
 
 if __name__ == '__main__':
     unittest.main()

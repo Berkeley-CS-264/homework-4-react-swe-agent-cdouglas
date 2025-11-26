@@ -88,12 +88,21 @@ class SWEEnvironment:
         Show the content of the file.
 
         Args:
-            file_path (str): Path to the file to read
+            file_path (str): Path to the file to read (tolerates leading/trailing whitespace, relative paths)
 
         Returns:
             The contents of the file
         """
         try:
+            # Normalize file path: strip whitespace, handle relative paths
+            file_path = file_path.strip()
+            if not file_path:
+                raise ValueError("File path cannot be empty")
+
+            # Remove leading ./ if present (common agent mistake)
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+
             output = self.env.execute(f"cat '{file_path}'")
 
             # Handle case where execute returns a dict instead of string
@@ -107,16 +116,20 @@ class SWEEnvironment:
         except TimeoutError:
             raise ValueError(f"Timeout reading file {file_path}")
         except Exception as e:
-            raise ValueError(f"Error reading file {file_path}: {str(e)}")
+            error_msg = str(e)
+            # Provide helpful error message
+            if "No such file" in error_msg or "cannot find" in error_msg.lower():
+                return f"Error: File '{file_path}' not found. Use find_files() or grep() to locate the correct path."
+            raise ValueError(f"Error reading file {file_path}: {error_msg}")
 
     def replace_in_file(self, file_path: str, from_line: int, to_line: int, content: str) -> str:
         """
         Replace lines in a file from from_line to to_line (inclusive, 1-indexed) with the given content.
 
         Args:
-            file_path (str): Path to the file to modify
-            from_line (int): Starting line number (1-indexed, inclusive)
-            to_line (int): Ending line number (1-indexed, inclusive)
+            file_path (str): Path to the file to modify (tolerates leading/trailing whitespace, relative paths)
+            from_line (int): Starting line number (1-indexed, inclusive). Auto-corrects if to_line < from_line.
+            to_line (int): Ending line number (1-indexed, inclusive). Auto-corrects if < from_line.
             content (str): New content to replace the lines with (can be multiline)
 
         Returns:
@@ -126,6 +139,29 @@ class SWEEnvironment:
         import os
 
         try:
+            # Normalize file path
+            file_path = file_path.strip()
+            if not file_path:
+                raise ValueError("File path cannot be empty")
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+
+            # Normalize and validate line numbers (make tolerant)
+            try:
+                from_line = int(from_line)
+                to_line = int(to_line)
+            except (ValueError, TypeError):
+                raise ValueError(f"Line numbers must be integers. Got from_line={from_line}, to_line={to_line}")
+
+            # Auto-correct if to_line < from_line (common mistake)
+            if to_line < from_line:
+                from_line, to_line = to_line, from_line
+
+            # Ensure line numbers are positive
+            if from_line < 1:
+                from_line = 1
+            if to_line < 1:
+                to_line = 1
             # Use Python to safely replace lines in the file
             # We'll use base64 encoding to safely pass the content through the command line
             import base64
@@ -160,19 +196,20 @@ except Exception as e:
     print(f"Error reading file: {{e}}", file=sys.stderr)
     sys.exit(1)
 
-# Validate line numbers
+# Validate line numbers (already normalized by outer function)
 from_line = {from_line}
 to_line = {to_line}
 
-if from_line < 1 or to_line < 1:
-    print("Error: Line numbers must be >= 1", file=sys.stderr)
-    sys.exit(1)
+# More tolerant validation - allow appending at end of file
 if from_line > len(lines) + 1:
-    print(f"Error: from_line ({{from_line}}) exceeds file length ({{len(lines)}})", file=sys.stderr)
-    sys.exit(1)
+    # Allow appending at end
+    from_line = len(lines) + 1
+    to_line = len(lines)
+    print(f"Warning: Line numbers adjusted. File has {{len(lines)}} lines. Appending at end.", file=sys.stderr)
+
 if to_line < from_line:
-    print("Error: to_line must be >= from_line", file=sys.stderr)
-    sys.exit(1)
+    # Auto-correct
+    from_line, to_line = to_line, from_line
 
 # Prepare new content (split into lines)
 new_lines = new_content.splitlines(keepends=True)
@@ -281,21 +318,39 @@ except Exception as e:
         Run tests using pytest.
 
         Args:
-            test_path (str): Path to test file or directory (e.g., "tests/test_misc.py")
+            test_path (str): Path to test file or directory (e.g., "tests/test_misc.py").
+                            Tolerates leading/trailing whitespace, relative paths, with/without .py extension.
             test_name (str): Specific test function name (e.g., "test_inherit_docstrings")
-            verbose (bool): Whether to show verbose output
+            verbose (bool): Whether to show verbose output (accepts bool, int, or string "true"/"false")
 
         Returns:
             Test output
         """
         try:
+            # Normalize verbose flag (tolerant of string inputs)
+            if isinstance(verbose, str):
+                verbose = verbose.lower() in ('true', '1', 'yes', 'on')
+            verbose = bool(verbose)
+
             cmd_parts = ["pytest", "-q"]
             if verbose:
                 cmd_parts.append("-v")
 
             if test_path:
+                # Normalize test path
+                test_path = test_path.strip()
+                if test_path.startswith('./'):
+                    test_path = test_path[2:]
+                # Remove .py extension if present (pytest handles both)
+                if test_path.endswith('.py'):
+                    test_path = test_path[:-3]
                 cmd_parts.append(test_path)
             elif test_name:
+                # Normalize test name
+                test_name = test_name.strip()
+                # Remove "test_" prefix if agent adds it redundantly
+                if test_name.startswith('test_') and 'test_' in test_name[5:]:
+                    test_name = test_name[5:]
                 # Search for the test function
                 cmd_parts.append("-k")
                 cmd_parts.append(test_name)
@@ -310,19 +365,30 @@ except Exception as e:
 
             return output
         except Exception as e:
-            raise ValueError(f"Error running tests: {str(e)}")
+            error_msg = str(e)
+            # Provide helpful error message
+            if "not found" in error_msg.lower() or "no such file" in error_msg.lower():
+                return f"Error: Test path not found. Use find_test_file() to locate test files.\nOriginal error: {error_msg}"
+            raise ValueError(f"Error running tests: {error_msg}")
 
     def check_syntax(self, file_path: str) -> str:
         """
         Check Python syntax of a file.
 
         Args:
-            file_path (str): Path to Python file to check
+            file_path (str): Path to Python file to check (tolerates leading/trailing whitespace, relative paths)
 
         Returns:
-            Syntax check result (empty if valid, error message if invalid)
+            Syntax check result ("Syntax OK" if valid, error message if invalid)
         """
         try:
+            # Normalize file path
+            file_path = file_path.strip()
+            if not file_path:
+                raise ValueError("File path cannot be empty")
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+
             cmd = f"python3 -m py_compile '{file_path}' 2>&1"
             output = self.env.execute(cmd)
 
@@ -338,6 +404,8 @@ except Exception as e:
             error_msg = str(e)
             if "SyntaxError" in error_msg or "syntax" in error_msg.lower():
                 return error_msg
+            if "No such file" in error_msg or "cannot find" in error_msg.lower():
+                return f"Error: File '{file_path}' not found. Cannot check syntax."
             raise ValueError(f"Error checking syntax: {error_msg}")
 
     def analyze_test_failure(self, test_output: str) -> str:
@@ -439,25 +507,37 @@ except Exception as e:
         except Exception as e:
             raise ValueError(f"Error finding test files: {str(e)}")
 
-    def show_diff(self, file_path: str) -> str:
+    def show_diff(self, file_path: str = None) -> str:
         """
         Show the git diff for a file to see what has changed.
 
         Args:
-            file_path (str): Path to the file
+            file_path (str, optional): Path to the file. If None or empty, shows diff for all changed files.
+                                      Tolerates leading/trailing whitespace, relative paths.
 
         Returns:
             Git diff output showing changes
         """
         try:
-            cmd = f"git diff '{file_path}' 2>&1"
+            if file_path:
+                # Normalize file path
+                file_path = file_path.strip()
+                if file_path.startswith('./'):
+                    file_path = file_path[2:]
+                cmd = f"git diff '{file_path}' 2>&1"
+            else:
+                # Show diff for all changed files
+                cmd = "git diff 2>&1"
+
             output = self.env.execute(cmd)
 
             if isinstance(output, dict):
                 output = output.get("output", "") or output.get("stdout", "")
 
             if not output or "fatal" in output.lower():
-                return "No changes detected (file may not be tracked or no changes made)"
+                if file_path:
+                    return f"No changes detected for '{file_path}' (file may not be tracked or no changes made)"
+                return "No changes detected (no files have been modified)"
 
             return output
         except Exception as e:
