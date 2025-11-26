@@ -26,6 +26,7 @@ def get_sb_environment(instance: dict) -> Environment:
         "image": get_swebench_docker_image_name(instance),
         "cwd": "/testbed",
         "timeout": 60,
+        "pull_timeout": 300,  # Increase to 5 minutes for slow networks
         "env": {
             "PAGER": "cat",
             "MANPAGER": "cat",

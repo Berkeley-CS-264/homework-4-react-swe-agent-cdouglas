@@ -44,16 +44,42 @@ def process_instance(
     result = ""
     
     try:
-        # Initialize the environment
-        env = SWEEnvironment(instance)
+        # Initialize the environment with retry logic for Docker pull timeouts
+        max_retries = 3
+        retry_count = 0
+        env = None
+        while retry_count < max_retries:
+            try:
+                env = SWEEnvironment(instance)
+                break
+            except Exception as e:
+                if "timed out" in str(e).lower() or "timeout" in str(e).lower():
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        wait_time = 5 * retry_count  # Exponential backoff: 5s, 10s, 15s
+                        print(f"Retry {retry_count}/{max_retries} for {instance_id} after {wait_time}s (Docker timeout)")
+                        import time
+                        time.sleep(wait_time)
+                    else:
+                        raise
+                else:
+                    raise
+
+        if env is None:
+            raise RuntimeError(f"Failed to create environment for {instance_id} after {max_retries} retries")
         # Initialize the agent
         agent = ReactAgent("swe-agent", parser, llm)
         
         # Add environment functions to the agent
-        agent.add_functions([env.run_bash_cmd])
-        
-        # TODO(student): Add more functions here if needed
-        # agent.add_functions([env.replace_in_file, env.show_file, ...])
+        agent.add_functions([
+            env.run_bash_cmd,
+            env.show_file,
+            env.replace_in_file,
+            env.grep,
+            env.find_files,
+            env.run_test,
+            env.check_syntax,
+        ])
         
         # Run the agent
         output = agent.run(task, max_steps) 
@@ -93,7 +119,7 @@ def main(
     print(f"Loading dataset {dataset_path}, split {split}...")
     instances = list(load_dataset(dataset_path, split=split))
     # limit to 1 instance for testing
-    instances = instances[:1]
+    # instances = instances[:1]
     print(f"Running on {len(instances)} instances...")
 
     def process_futures(futures: dict[concurrent.futures.Future, str]):
@@ -106,7 +132,10 @@ def main(
                 instance_id = futures[future]
                 print(f"Error in future for instance {instance_id}: {e}")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    # Reduce parallelism to avoid overwhelming Docker with simultaneous image pulls
+    # Start with fewer workers, can increase once images are cached
+    max_workers = min(8, len(instances))  # Max 8 workers to avoid Docker pull timeouts
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(process_instance, instance, output_path, model_name, max_steps): instance[
                 "instance_id"

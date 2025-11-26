@@ -193,6 +193,117 @@ except Exception as e:
         except Exception as e:
             raise ValueError(f"Error replacing lines in {file_path}: {str(e)}")
 
+    def grep(self, pattern: str, file_pattern: str = "*", case_sensitive: bool = True) -> str:
+        """
+        Search for a pattern in files using grep.
+
+        Args:
+            pattern (str): The pattern to search for (regex)
+            file_pattern (str): File pattern to search in (e.g., "*.py", "test_*.py")
+            case_sensitive (bool): Whether search is case-sensitive
+
+        Returns:
+            Matching lines with file names and line numbers
+        """
+        try:
+            flags = "-E" if case_sensitive else "-iE"  # -E for extended regex
+            cmd = f"grep -rn {flags} '{pattern}' --include='{file_pattern}' . 2>/dev/null || true"
+            output = self.env.execute(cmd)
+
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            return output if output else "No matches found"
+        except Exception as e:
+            raise ValueError(f"Error searching for pattern: {str(e)}")
+
+    def find_files(self, name_pattern: str = "*", file_type: str = "f") -> str:
+        """
+        Find files matching a pattern.
+
+        Args:
+            name_pattern (str): Filename pattern (e.g., "test_*.py", "*misc.py")
+            file_type (str): "f" for files, "d" for directories
+
+        Returns:
+            List of matching file paths
+        """
+        try:
+            # Use find with proper escaping
+            cmd = f"find . -type {file_type} -name '{name_pattern}' 2>/dev/null | head -50"
+            output = self.env.execute(cmd)
+
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            return output if output else "No files found"
+        except Exception as e:
+            raise ValueError(f"Error finding files: {str(e)}")
+
+    def run_test(self, test_path: str = None, test_name: str = None, verbose: bool = False) -> str:
+        """
+        Run tests using pytest.
+
+        Args:
+            test_path (str): Path to test file or directory (e.g., "tests/test_misc.py")
+            test_name (str): Specific test function name (e.g., "test_inherit_docstrings")
+            verbose (bool): Whether to show verbose output
+
+        Returns:
+            Test output
+        """
+        try:
+            cmd_parts = ["pytest", "-q"]
+            if verbose:
+                cmd_parts.append("-v")
+
+            if test_path:
+                cmd_parts.append(test_path)
+            elif test_name:
+                # Search for the test function
+                cmd_parts.append("-k")
+                cmd_parts.append(test_name)
+            else:
+                cmd_parts.append(".")
+
+            cmd = " ".join(cmd_parts)
+            output = self.env.execute(cmd)
+
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            return output
+        except Exception as e:
+            raise ValueError(f"Error running tests: {str(e)}")
+
+    def check_syntax(self, file_path: str) -> str:
+        """
+        Check Python syntax of a file.
+
+        Args:
+            file_path (str): Path to Python file to check
+
+        Returns:
+            Syntax check result (empty if valid, error message if invalid)
+        """
+        try:
+            cmd = f"python3 -m py_compile '{file_path}' 2>&1"
+            output = self.env.execute(cmd)
+
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            # If compilation succeeds, output is usually empty
+            if not output or "SyntaxError" not in output:
+                return "Syntax OK"
+            return output
+        except Exception as e:
+            # If command fails, there's a syntax error
+            error_msg = str(e)
+            if "SyntaxError" in error_msg or "syntax" in error_msg.lower():
+                return error_msg
+            raise ValueError(f"Error checking syntax: {error_msg}")
+
 class DumbEnvironment:
     """
     Dumb environment that just executes the command
