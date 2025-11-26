@@ -79,6 +79,9 @@ def process_instance(
             env.find_files,
             env.run_test,
             env.check_syntax,
+            env.analyze_test_failure,
+            env.find_test_file,
+            env.show_diff,
         ])
         
         # Run the agent

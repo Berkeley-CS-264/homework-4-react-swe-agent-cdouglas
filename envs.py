@@ -304,6 +304,129 @@ except Exception as e:
                 return error_msg
             raise ValueError(f"Error checking syntax: {error_msg}")
 
+    def analyze_test_failure(self, test_output: str) -> str:
+        """
+        Analyze test failure output to extract key information.
+
+        Args:
+            test_output (str): The output from a failed test run
+
+        Returns:
+            Analysis of the failure including error type, message, and location
+        """
+        try:
+            # Extract key failure information
+            lines = test_output.split('\n')
+            analysis = []
+
+            # Look for common failure patterns
+            error_type = None
+            error_message = None
+            file_location = None
+            traceback_lines = []
+
+            in_traceback = False
+            for i, line in enumerate(lines):
+                if "FAILED" in line or "ERROR" in line:
+                    analysis.append(f"Test Status: {line.strip()}")
+                elif "AssertionError" in line or "ValueError" in line or "TypeError" in line or "AttributeError" in line:
+                    error_type = line.strip()
+                    analysis.append(f"Error Type: {error_type}")
+                elif "def test_" in line and file_location is None:
+                    # Try to find test function
+                    analysis.append(f"Test Function: {line.strip()}")
+                elif ".py:" in line and ("test_" in line or "FAILED" in line):
+                    file_location = line.strip()
+                    analysis.append(f"File Location: {file_location}")
+                elif "assert" in line.lower() and "failed" in line.lower():
+                    analysis.append(f"Assertion: {line.strip()}")
+                elif line.strip().startswith("E ") and len(line.strip()) > 2:
+                    # Error message line
+                    error_message = line.strip()[2:]
+                    analysis.append(f"Error Message: {error_message}")
+
+            if not analysis:
+                # Fallback: return key sections
+                key_sections = []
+                for line in lines[-20:]:  # Last 20 lines often have the error
+                    if any(keyword in line for keyword in ["FAILED", "ERROR", "AssertionError", "ValueError", "TypeError", "AttributeError", "assert"]):
+                        key_sections.append(line.strip())
+                if key_sections:
+                    return "Key failure information:\n" + "\n".join(key_sections)
+                return "Could not extract failure details. Full output:\n" + test_output[-500:]  # Last 500 chars
+
+            return "\n".join(analysis) if analysis else "No failure information extracted"
+        except Exception as e:
+            return f"Error analyzing test failure: {str(e)}\n\nRaw output:\n{test_output[-500:]}"
+
+    def find_test_file(self, issue_description: str = None) -> str:
+        """
+        Find test files related to the issue.
+
+        Args:
+            issue_description (str): Optional description to help find relevant tests
+
+        Returns:
+            List of test files that might be relevant
+        """
+        try:
+            # Find all test files
+            cmd = "find . -name 'test_*.py' -o -name '*_test.py' 2>/dev/null | head -20"
+            output = self.env.execute(cmd)
+
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            if not output:
+                return "No test files found"
+
+            # If we have issue description, try to match
+            if issue_description:
+                # Simple keyword matching
+                keywords = []
+                for word in issue_description.lower().split():
+                    if len(word) > 4:  # Skip short words
+                        keywords.append(word)
+
+                matching_files = []
+                for line in output.split('\n'):
+                    if line.strip():
+                        # Check if any keyword appears in the path
+                        line_lower = line.lower()
+                        if any(kw in line_lower for kw in keywords[:3]):  # Check first 3 keywords
+                            matching_files.append(line.strip())
+
+                if matching_files:
+                    return "Potentially relevant test files:\n" + "\n".join(matching_files[:10])
+
+            return "Test files found:\n" + output
+        except Exception as e:
+            raise ValueError(f"Error finding test files: {str(e)}")
+
+    def show_diff(self, file_path: str) -> str:
+        """
+        Show the git diff for a file to see what has changed.
+
+        Args:
+            file_path (str): Path to the file
+
+        Returns:
+            Git diff output showing changes
+        """
+        try:
+            cmd = f"git diff '{file_path}' 2>&1"
+            output = self.env.execute(cmd)
+
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            if not output or "fatal" in output.lower():
+                return "No changes detected (file may not be tracked or no changes made)"
+
+            return output
+        except Exception as e:
+            raise ValueError(f"Error showing diff: {str(e)}")
+
 class DumbEnvironment:
     """
     Dumb environment that just executes the command
