@@ -72,6 +72,7 @@ def process_instance(
         
         # Add environment functions to the agent
         agent.add_functions([
+            env.get_repo_info,
             env.run_bash_cmd,
             env.show_file,
             env.replace_in_file,

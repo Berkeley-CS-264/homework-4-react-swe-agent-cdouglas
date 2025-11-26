@@ -477,6 +477,31 @@ except Exception as e:
         except Exception as e:
             return f"Error getting git status: {e}"
 
+    def get_repo_info(self) -> str:
+        """Get repository name and root directory information.
+
+        Returns:
+            String containing repository name and root directory path
+        """
+        try:
+            repo = self.instance.get("repo", "unknown")
+            # Extract repo name from instance_id (format: repo__repo-issue)
+            instance_id = self.instance.get("instance_id", "")
+            if "__" in instance_id:
+                repo_name = instance_id.split("__")[0]
+            else:
+                repo_name = repo
+
+            # Get root directory (usually /testbed in Docker containers)
+            root_dir = self.env.execute("pwd")
+            if isinstance(root_dir, dict):
+                root_dir = root_dir.get("output", "") or root_dir.get("stdout", "")
+            root_dir = root_dir.strip() if root_dir else "/testbed"
+
+            return f"Repository: {repo_name}\nRoot directory: {root_dir}"
+        except Exception as e:
+            return f"Repository: {self.instance.get('repo', 'unknown')}\nRoot directory: /testbed\n(Error getting details: {e})"
+
 class DumbEnvironment:
     """
     Dumb environment that just executes the command

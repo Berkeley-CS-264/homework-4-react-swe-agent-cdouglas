@@ -42,58 +42,56 @@ class ReactAgent:
 
         # Set up the initial structure of the history
         # Create required root nodes and a user node (task)
-        initial_system_content = """You are a Smart ReAct agent specialized in fixing software engineering issues.
+        initial_system_content = """You are an autonomous software engineer working in a local checkout of a repository.
+Your task is to modify the code so that the issue below is resolved and all relevant tests pass.
 
-## CRITICAL: Reasoning and Self-Reporting Requirements
+## Environment & Constraints
+- You work in a local Python environment with the repo at the root directory
+- You have NO internet access
+- You may only interact with the repo using the tools listed below
+- Do NOT modify tests or test data unless explicitly instructed
+- Prefer minimal, targeted changes over broad refactors
+- Use `get_repo_info()` to learn the repository name and root directory
 
-**You MUST report your reasoning at each step to help diagnose issues:**
+## Recommended Workflow
 
-1. **Before making changes**: Explain:
-   - What problem you identified
-   - Why you think your approach will work
-   - What assumptions you're making
-   - What edge cases you're considering
+1. **Understand the Problem**
+   - Read the issue description carefully
+   - Find and read the relevant test file using `find_test_file()` or `grep()`
+   - Identify what should happen vs. what actually happens
+   - Use `get_repo_info()` to understand the repository context
 
-2. **After making changes**: Explain:
-   - What you changed and why
-   - How this addresses the root cause
-   - What could still go wrong
-   - Why you believe this is the correct fix
+2. **Locate Relevant Code**
+   - Use `grep()` and `find_files()` to find relevant files
+   - Use `show_file()` to read code sections
+   - Trace through the codebase to understand the flow
 
-3. **Before calling finish**: You MUST:
-   - Run tests to verify your fix works
-   - If tests fail, analyze the failure and explain what went wrong
-   - Document your reasoning in the finish result message
-   - Include: problem analysis, solution approach, test results, and any concerns
+3. **Make Changes**
+   - Use `replace_in_file(file_path, from_line, to_line, content)` to modify code
+   - Line numbers are 1-indexed and inclusive (both from_line and to_line are included)
+   - Make minimal, targeted changes
+   - Preserve existing code style and patterns
 
-**Example reasoning format:**
-```
-REASONING:
-- Problem: [What is the issue?]
-- Root cause: [Why does it happen?]
-- Solution: [What I'm changing and why]
-- Assumptions: [What I'm assuming]
-- Edge cases: [What edge cases I considered]
-- Test status: [Did tests pass? If not, why?]
-```
+4. **Verify Changes**
+   - Use `show_diff(file_path)` to see what changed in each modified file
+   - Use `verify_changes()` to confirm files are modified
+   - Use `check_syntax(file_path)` to validate Python syntax
+   - Run tests with `run_test()` to verify the fix
 
-## Key Problem-Solving Strategies
+5. **Complete the Task**
+   - Only call `finish()` after verifying changes exist
+   - The `finish()` result parameter is for logging only
+   - Actual patch is generated automatically from file edits via git
 
-### 1. Understanding the Problem (CRITICAL FIRST STEP)
-- Read the issue description CAREFULLY - identify the exact problem statement
-- Look for specific error messages, stack traces, or behavioral descriptions
-- Identify what SHOULD happen vs. what ACTUALLY happens
-- Find the test file that reproduces the issue - read it completely
-- Understand the expected behavior from the test, not just the error message
+## Critical Rules
 
-### 2. Code Navigation and Analysis
-- Use grep/search tools to find ALL relevant code sections
-- Read test files COMPLETELY to understand expected behavior
-- Trace through the codebase to understand data flow
-- Look for similar patterns in the codebase that might guide you
-- Check if there are related issues or similar fixes in the codebase
+- **You MUST use `replace_in_file()` to make actual code changes**
+- **You MUST verify changes exist before calling `finish()`**
+- **Text descriptions in `finish()` do NOT create patches - only file edits do**
+- **If `verify_changes()` shows no changes, you haven't fixed the issue**
+- **Always run tests before finishing to ensure your fix works**
 
-### 3. Common Fix Patterns (Based on Successful Solutions)
+## Common Fix Patterns
 
 **Metaclasses and Descriptors:**
 - Properties: Cannot assign __doc__ directly. Create new property: `property(fget, fset, fdel, doc=inherited_doc)`
@@ -103,19 +101,9 @@ REASONING:
 **Variable Scoping:**
 - Preserve state before try/except blocks if you need to restore on exception
 - Use explicit variable assignments rather than relying on loop variables
-- Track state with sets/dicts to avoid duplicates
 
 **Exception Handling:**
 - Always restore previous state in finally blocks or exception handlers
-- Consider what happens when operations fail mid-execution
-
-**Reflected Operations:**
-- Implement `__rmul__`, `__radd__`, etc. for operations like `scalar * object`
-- Delegate to the main operation method for consistency
-
-**Collection Completeness:**
-- Check all sources: user-specified items AND runtime-generated items
-- Look for hidden state (like `remainder` attributes) that might be missed
 
 **Import Organization:**
 - Plain `import` statements should come before `from ... import` statements
@@ -129,53 +117,11 @@ REASONING:
 - Use dimension system's `equivalent_dims()` method instead of structural equality
 - Example: `acceleration * time` is equivalent to `velocity` but not structurally equal
 
-### 4. Testing Strategy (MANDATORY)
-- **ALWAYS run tests BEFORE calling finish**
-- Run specific failing tests first to understand the issue
-- After making changes, run the same tests to verify the fix
-- Run related tests to ensure no regressions
-- Pay attention to test output - it often contains clues about what's wrong
-- If tests fail, analyze the failure output carefully - don't just guess
-
-### 5. Edge Cases to Consider
-- Empty values (None, '', [], {})
-- Boundary conditions (first/last items, empty collections)
-- Type mismatches (str vs bytes, lazy objects vs concrete values)
-- Thread lifecycle and daemon thread behavior
-- Optional dependencies that might not be installed
-- Documentation-only changes may not be evaluated correctly
-
-### 6. When Stuck or Tests Fail
+## When Stuck
 - Re-read the issue description - you might have missed a detail
 - Re-read the test file - understand what it's actually testing
 - Check if similar issues exist in the codebase (grep for related code)
-- Consider if the fix needs to handle multiple cases (properties, functions, classmethods)
-- Verify your understanding by reading the code that uses the code you're fixing
-- **If tests fail after your change**: Analyze the failure output, explain what went wrong, and try a different approach
-
-### 7. CRITICAL: Making Changes
-- **You MUST use replace_in_file() to make actual code changes**
-- The finish() result parameter is for logging/reasoning only - it does NOT create a patch
-- A valid patch is generated automatically from your file edits via git
-- **Before calling finish(), you MUST verify your changes:**
-  1. Use show_diff(file_path) to see what changed in each file you modified
-  2. Use verify_changes() or run_bash_cmd("git status") to confirm files are modified
-  3. If no changes detected, you haven't actually fixed the issue - you need to use replace_in_file()
-- **Text descriptions in finish() will NOT work as patches** - only actual file edits create valid patches
-- If you describe a fix but don't make the changes, the patch will be empty and the fix won't be applied
-
-### 8. Code Quality
-- Add comments explaining WHY the fix works, not just WHAT it does
-- Preserve existing code style and patterns
-- Handle edge cases gracefully with appropriate fallbacks
-- DO NOT modify test files - they are used for evaluation
-
-### 9. Common Failure Modes (Learn from These)
-- **Making changes without testing**: Always test before finishing
-- **Fixing symptoms instead of root cause**: Understand why the issue occurs
-- **Missing edge cases**: Consider all code paths and input types
-- **Incomplete fixes**: Ensure your fix handles all scenarios mentioned in the issue
-- **Not reading tests carefully**: Tests reveal the expected behavior"""
+- Use `analyze_test_failure()` to understand test failures better"""
 
         self.system_message_id = self.add_message("system", initial_system_content)
         self.user_message_id = self.add_message("user", "")
@@ -188,8 +134,6 @@ REASONING:
         Create a new message and add it to the list.
 
         The message must include fields: role, content, timestamp, unique_id.
-        
-        TODO(student): Implement this function to add a message to the list
         """
         self.id_to_message.append({
             "role": role,
@@ -202,8 +146,6 @@ REASONING:
     def set_message_content(self, message_id: int, content: str) -> None:
         """
         Update message content by id.
-        
-        TODO(student): Implement this function to update a message's content
         """
         self.id_to_message[message_id]["content"] = content
 
@@ -249,19 +191,53 @@ REASONING:
         # Register tools in function map
         self.function_map.update({tool.__name__: tool for tool in tools})
         
-        # Update system message with tool descriptions
-        tool_descriptions = []
+        # Organize tools by category
+        tool_categories = {
+            "Repository Information": ["get_repo_info"],
+            "File Operations": ["show_file", "replace_in_file", "grep", "find_files"],
+            "Testing & Analysis": ["run_test", "analyze_test_failure", "find_test_file", "check_syntax"],
+            "Git & Verification": ["show_diff", "verify_changes", "get_git_status"],
+            "General": ["run_bash_cmd", "finish"],
+        }
+
+        # Build organized tool descriptions
+        categorized_tools = {cat: [] for cat in tool_categories.keys()}
+        uncategorized = []
+
         for tool in self.function_map.values():
             signature = inspect.signature(tool)
             docstring = inspect.getdoc(tool) or ""
             tool_description = f"Function: {tool.__name__}{signature}\n{docstring}\n"
-            tool_descriptions.append(tool_description)
+
+            # Find which category this tool belongs to
+            categorized = False
+            for category, tool_names in tool_categories.items():
+                if tool.__name__ in tool_names:
+                    categorized_tools[category].append(tool_description)
+                    categorized = True
+                    break
+
+            if not categorized:
+                uncategorized.append(tool_description)
+
+        # Build tool text with categories
+        tool_sections = []
+        for category, descriptions in categorized_tools.items():
+            if descriptions:
+                tool_sections.append(f"### {category}\n" + "\n".join(descriptions))
+
+        if uncategorized:
+            tool_sections.append("### Other Tools\n" + "\n".join(uncategorized))
+
+        tool_text = "\n".join(tool_sections)
         
-        tool_text = "\n".join(tool_descriptions)
+        # Get current system content and append tool descriptions
+        current_content = self.id_to_message[self.system_message_id]["content"]
         system_content = (
-            "You are a Smart ReAct agent.\n\n"
-            f"--- AVAILABLE TOOLS ---\n{tool_text}\n\n"
-            f"--- RESPONSE FORMAT ---\n{self.parser.response_format}\n"
+            f"{current_content}\n\n"
+            f"## Available Tools\n\n{tool_text}\n\n"
+            f"## Response Format\n\n{self.parser.response_format}\n\n"
+            "DO NOT CHANGE ANY TEST! AS THEY WILL BE USED FOR EVALUATION."
         )
         self.set_message_content(self.system_message_id, system_content)
     
