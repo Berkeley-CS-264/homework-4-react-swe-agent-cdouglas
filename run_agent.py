@@ -82,6 +82,8 @@ def process_instance(
             env.analyze_test_failure,
             env.find_test_file,
             env.show_diff,
+            env.verify_changes,
+            env.get_git_status,
         ])
         
         # Run the agent
@@ -90,6 +92,15 @@ def process_instance(
         # Generate patch for SWE-Bench
         result = env.generate_patch(output)
         
+        # Validate patch format before saving
+        if result and not result.strip().startswith("diff --git"):
+            if result.strip():  # Non-empty but invalid
+                print(f"WARNING: {instance_id} generated invalid patch format")
+                print(f"Patch preview: {result[:200]}...")
+                print(f"Agent output was: {output[:200]}...")
+            # Convert to empty patch (valid format)
+            result = ""
+
     except Exception as e:
         print(f"Error processing instance {instance_id}: {e}")
         

@@ -153,13 +153,24 @@ REASONING:
 - Verify your understanding by reading the code that uses the code you're fixing
 - **If tests fail after your change**: Analyze the failure output, explain what went wrong, and try a different approach
 
-### 7. Code Quality
+### 7. CRITICAL: Making Changes
+- **You MUST use replace_in_file() to make actual code changes**
+- The finish() result parameter is for logging/reasoning only - it does NOT create a patch
+- A valid patch is generated automatically from your file edits via git
+- **Before calling finish(), you MUST verify your changes:**
+  1. Use show_diff(file_path) to see what changed in each file you modified
+  2. Use verify_changes() or run_bash_cmd("git status") to confirm files are modified
+  3. If no changes detected, you haven't actually fixed the issue - you need to use replace_in_file()
+- **Text descriptions in finish() will NOT work as patches** - only actual file edits create valid patches
+- If you describe a fix but don't make the changes, the patch will be empty and the fix won't be applied
+
+### 8. Code Quality
 - Add comments explaining WHY the fix works, not just WHAT it does
 - Preserve existing code style and patterns
 - Handle edge cases gracefully with appropriate fallbacks
 - DO NOT modify test files - they are used for evaluation
 
-### 8. Common Failure Modes (Learn from These)
+### 9. Common Failure Modes (Learn from These)
 - **Making changes without testing**: Always test before finishing
 - **Fixing symptoms instead of root cause**: Understand why the issue occurs
 - **Missing edge cases**: Consider all code paths and input types

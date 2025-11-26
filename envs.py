@@ -46,21 +46,41 @@ class SWEEnvironment:
     
     def generate_patch(self, result: str) -> str:
         """
-        Generate a patch from the result (for SWE-Bench)
+        Generate a patch from staged changes. Returns valid git diff or empty string.
+
+        Args:
+            result (str): The agent's result message (for logging, not included in patch)
+
+        Returns:
+            str: Valid git diff format patch, or empty string if no changes detected
         """
         try:
-            patch_output = self.env.execute("git add -A && git diff --cached")
+            # Ensure all changes are staged
+            add_result = self.env.execute("git add -A")
+            if isinstance(add_result, dict):
+                add_result = add_result.get("output", "") or add_result.get("stdout", "")
             
-            # Handle case where execute returns a dict instead of string
+            # Get the diff
+            patch_output = self.env.execute("git diff --cached")
             if isinstance(patch_output, dict):
                 patch_output = patch_output.get("output", "") or patch_output.get("stdout", "")
             
-            if patch_output and patch_output.strip():
-                return patch_output
-            else:
-                return f"{result}\n\nNo changes detected to generate a patch."
+            # Validate it's a proper git diff
+            if patch_output and patch_output.strip().startswith("diff --git"):
+                return patch_output.strip()
+
+            # If no valid patch, check git status to understand why (for debugging)
+            # But don't include this in the return value - just return empty string
+            status = self.env.execute("git status --short")
+            if isinstance(status, dict):
+                status = status.get("output", "") or status.get("stdout", "")
+
+            # Return empty string (valid empty patch) instead of text description
+            return ""
         except Exception as e:
-            return f"{result}\n\nError running git commands: {e}"
+            # Log error but return empty patch (not error text)
+            # Empty string is a valid patch format that evaluation harness accepts
+            return ""
 
     # -------------------- OPTIONAL TOOLS --------------------
     def show_file(self, file_path: str) -> str:
@@ -426,6 +446,36 @@ except Exception as e:
             return output
         except Exception as e:
             raise ValueError(f"Error showing diff: {str(e)}")
+
+    def verify_changes(self) -> str:
+        """
+        Verify that file changes exist and are staged.
+
+        Returns:
+            Git status output showing modified files, or "No changes detected"
+        """
+        try:
+            status = self.env.execute("git status --short")
+            if isinstance(status, dict):
+                status = status.get("output", "") or status.get("stdout", "")
+            return status if status else "No changes detected"
+        except Exception as e:
+            return f"Error checking status: {e}"
+
+    def get_git_status(self) -> str:
+        """
+        Get detailed git status to help debug why changes aren't detected.
+
+        Returns:
+            Full git status output
+        """
+        try:
+            status = self.env.execute("git status")
+            if isinstance(status, dict):
+                status = status.get("output", "") or status.get("stdout", "")
+            return status if status else "No git status available"
+        except Exception as e:
+            return f"Error getting git status: {e}"
 
 class DumbEnvironment:
     """
