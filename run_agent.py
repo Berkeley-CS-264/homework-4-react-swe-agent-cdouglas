@@ -93,7 +93,7 @@ def main(
     print(f"Loading dataset {dataset_path}, split {split}...")
     instances = list(load_dataset(dataset_path, split=split))
     # limit to 1 instance for testing
-    # instances = instances[:1]
+    instances = instances[:1]
     print(f"Running on {len(instances)} instances...")
 
     def process_futures(futures: dict[concurrent.futures.Future, str]):
