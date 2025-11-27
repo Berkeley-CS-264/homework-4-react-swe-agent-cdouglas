@@ -97,9 +97,12 @@ Your task is to modify the code so that the issue below is resolved and all rele
      - Only call `finish()` after tests pass
 
 6. **Complete the Task**
+   - **Before calling finish(), use `can_finish()` to validate you're ready**
    - Only call `finish()` after verifying changes exist AND tests pass
    - The `finish()` result parameter is for logging only
    - Actual patch is generated automatically from file edits via git
+   - **If `verify_changes()` shows "No changes detected", the system will reject finish()**
+   - Use `stage_changes()` if changes exist but aren't being detected
 
 ## Critical Rules
 
@@ -109,38 +112,123 @@ Your task is to modify the code so that the issue below is resolved and all rele
 - **Text descriptions in `finish()` do NOT create patches - only file edits do**
 - **If `verify_changes()` shows no changes, you haven't fixed the issue**
 - **If tests fail, debug and fix before finishing**
+- **The system will REJECT finish() if no changes are detected - you cannot finish without making file edits**
 
-## Common Fix Patterns
+## Common Fix Patterns (From Successful Instances)
 
 **Metaclasses and Descriptors:**
-- Properties: Cannot assign __doc__ directly. Create new property: `property(fget, fset, fdel, doc=inherited_doc)`
+- Properties: Cannot assign `__doc__` directly. Create new property: `property(fget, fset, fdel, doc=inherited_doc)`
 - Classmethod/staticmethod: Access underlying function via `__func__` attribute
 - Use `base.__dict__.get(key)` to avoid descriptor binding side-effects
 
 **Variable Scoping:**
 - Preserve state before try/except blocks if you need to restore on exception
 - Use explicit variable assignments rather than relying on loop variables
+- Extract values from collections before use in exception handlers
 
 **Exception Handling:**
 - Always restore previous state in finally blocks or exception handlers
+- Save handlers/state before operations that might fail
 
 **Import Organization:**
 - Plain `import` statements should come before `from ... import` statements
 - Sort within each group alphabetically
+- Use a custom sort key: `(is_from, module_name)` where `is_from=1` for "from" imports
 
 **Environment Variables:**
 - Prefer environment variables over temporary files when possible
 - Use `os.environ.copy()` and modify the copy for subprocess calls
+- Pass `env` parameter to `subprocess.run()` instead of modifying global environment
 
-**Dimension/Unit Equivalence:**
-- Use dimension system's `equivalent_dims()` method instead of structural equality
-- Example: `acceleration * time` is equivalent to `velocity` but not structurally equal
+**Reflected Operations:**
+- Implement `__rmul__`, `__radd__`, etc. for operations like `scalar * obj`
+- Delegate to the main method: `def __rmul__(self, other): return self.__mul__(other)`
+
+**Collection Completeness:**
+- Check all sources where items might be stored (including `remainder`, `_transformers`, etc.)
+- Look for hidden attributes that might contain related objects
+
+**Generator Deduplication:**
+- Track yielded items to avoid duplicates
+- Use a dictionary to store results: `results = {}` and `order = []`
+- Yield each item only once with its final state
+
+**Framework-Specific APIs:**
+- Use app-specific model access: `apps.get_app_config(app_label).get_models()`
+- Be aware of subtle differences between similar APIs
+
+## Tool Usage Best Practices
+
+**Before Making Changes:**
+1. Use `get_repo_info()` to understand the repository context
+2. Use `find_test_file(issue_description)` to locate relevant tests
+3. Read the test file completely with `show_file()` to understand expected behavior
+4. Use `grep()` to find related code and understand the codebase structure
+5. Use `show_code_structure(file_path)` to understand file organization (classes, functions) for large files
+6. Use `show_file()` to read the specific code sections you plan to modify
+
+**When Making Changes:**
+1. Use `replace_in_file()` for ALL code modifications (tools auto-normalize paths and line numbers)
+2. After each change, use `check_syntax()` to verify Python syntax
+3. Use `show_diff()` to review what changed
+4. Use `verify_changes()` to confirm changes are detected
+
+**When Testing:**
+1. Run the specific failing test first: `run_test(test_path, test_name)`
+2. If test fails, use `analyze_test_failure()` to understand why
+3. Read the error message carefully - it often points to the exact issue
+4. Run related tests to check for regressions
+5. Test edge cases mentioned in the issue description
+
+**Before Finishing:**
+1. Call `can_finish()` to validate you're ready
+2. Ensure `verify_changes()` shows modified files
+3. Ensure all relevant tests pass
+4. Review `show_diff()` to confirm your changes are correct
+
+**Debugging Test Failures:**
+1. Use `analyze_test_failure(test_output)` to extract key information
+2. Look for error types, messages, and file locations in the analysis
+3. Re-read the test to understand what it's actually checking
+4. Check if your fix addresses the root cause, not just symptoms
+
+## Common Failure Patterns (From Unresolved Instances)
+
+**Test Expectations vs. Implementation:**
+- Some issues require understanding subtle test expectations (e.g., django-12406: radio button selection)
+- Read the test carefully to understand what behavior is expected vs. what's happening
+- Test failures may indicate the fix is incomplete or addresses the wrong aspect
+
+**Complex Framework Behavior:**
+- Some issues involve complex framework internals (e.g., django-13297: lazy object handling)
+- Understand the framework's deprecation mechanisms and backward compatibility requirements
+- Test with actual rendering/execution, not just context creation
+
+**Thread and Resource Management:**
+- Thread lifecycle issues require understanding daemon threads and cleanup (e.g., django-14011)
+- Database connections in threads need proper cleanup
+- Consider thread synchronization and resource management
+
+**Regex and Pattern Matching:**
+- Regex patterns may need anchors (`^`, `$`) to match correctly (e.g., sphinx-9230)
+- Test regex patterns with various inputs to ensure they match correctly
+- Consider whitespace and edge cases in pattern matching
+
+**Code Structure Understanding:**
+- Use `show_code_structure()` for large files to understand organization
+- Look for related classes/functions that might need similar changes
+- Understand inheritance hierarchies and method resolution order
 
 ## When Stuck
-- Re-read the issue description - you might have missed a detail
-- Re-read the test file - understand what it's actually testing
-- Check if similar issues exist in the codebase (grep for related code)
-- Use `analyze_test_failure()` to understand test failures better"""
+- Re-read the issue description carefully - you might have missed a detail
+- Re-read the test file completely - understand what it's actually testing
+- Use `show_code_structure()` to understand large files before reading them
+- Use `grep()` to find similar code patterns in the codebase
+- Use `find_files()` to locate related files
+- Use `analyze_test_failure()` to understand test failures
+- Check if the issue is about edge cases you haven't considered
+- Verify your understanding by reading the code flow step-by-step
+- Consider that some fixes may require changes in multiple places"""
 
         self.system_message_id = self.add_message("system", initial_system_content)
         self.user_message_id = self.add_message("user", "")
@@ -213,9 +301,9 @@ Your task is to modify the code so that the issue below is resolved and all rele
         # Organize tools by category
         tool_categories = {
             "Repository Information": ["get_repo_info"],
-            "File Operations": ["show_file", "replace_in_file", "grep", "find_files"],
+            "File Operations": ["show_file", "replace_in_file", "grep", "find_files", "show_code_structure"],
             "Testing & Analysis": ["run_test", "analyze_test_failure", "find_test_file", "check_syntax"],
-            "Git & Verification": ["show_diff", "verify_changes", "get_git_status"],
+            "Git & Verification": ["show_diff", "verify_changes", "get_git_status", "stage_changes", "can_finish"],
             "General": ["run_bash_cmd", "finish"],
         }
 
@@ -309,6 +397,24 @@ Your task is to modify the code so that the issue below is resolved and all rele
             
             # Check if finish was called
             if function_call["name"] == "finish":
+                # MANDATORY: Verify changes exist before finishing
+                if "verify_changes" in self.function_map:
+                    changes_status = self.function_map["verify_changes"]()
+                    if "No changes detected" in changes_status or (not changes_status.strip() or changes_status.strip() == "No changes detected"):
+                        # Reject finish - no changes detected
+                        self.add_message("user",
+                            f"ERROR: Cannot finish - no changes detected!\n\n"
+                            f"Status: {changes_status}\n\n"
+                            f"You MUST use replace_in_file() to make actual code changes before calling finish(). "
+                            f"Text descriptions in finish() do NOT create patches - only file edits do.\n\n"
+                            f"Please:\n"
+                            f"1. Use replace_in_file() to modify the code\n"
+                            f"2. Call verify_changes() to confirm changes exist\n"
+                            f"3. Call can_finish() to validate you're ready\n"
+                            f"4. Only then call finish()")
+                        continue  # Don't finish, continue the loop
+
+                # Changes exist, allow finish
                 result = self.function_map["finish"](**function_call["arguments"])
                 return result
             

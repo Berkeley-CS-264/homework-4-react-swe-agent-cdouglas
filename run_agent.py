@@ -85,6 +85,9 @@ def process_instance(
             env.show_diff,
             env.verify_changes,
             env.get_git_status,
+            env.stage_changes,
+            env.can_finish,
+            env.show_code_structure,
         ])
         
         # Run the agent

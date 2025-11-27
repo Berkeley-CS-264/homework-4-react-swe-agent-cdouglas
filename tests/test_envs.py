@@ -590,6 +590,36 @@ if isinstance(other, Mul):
             self.assertEqual("", result)
             self.assertNotIn("No changes detected", result)
 
+    def test_show_code_structure(self):
+        """Test show_code_structure() extracts file structure correctly."""
+        test_file_content = """import os
+from pathlib import Path
+
+class MyClass:
+    def method1(self):
+        pass
+
+def function1():
+    pass
+
+class AnotherClass:
+    def method2(self):
+        pass
+"""
+        self.mock_env.files["test.py"] = test_file_content
+
+        result = self.env_wrapper.show_code_structure("test.py")
+
+        # Should contain file name
+        self.assertIn("test.py", result)
+        # Should contain class names
+        self.assertIn("MyClass", result)
+        self.assertIn("AnotherClass", result)
+        # Should contain function names
+        self.assertIn("function1", result)
+        # Should contain imports
+        self.assertIn("import", result.lower())
+
     def test_tool_tolerance_whitespace(self):
         """Test tools tolerate leading/trailing whitespace in paths."""
         self.mock_env.files["test.py"] = "content"
@@ -602,6 +632,108 @@ if isinstance(other, Mul):
         with patch.object(self.env_wrapper.env, 'execute', return_value=""):
             result = self.env_wrapper.check_syntax("  test.py  ")
             self.assertEqual("Syntax OK", result)
+
+    # Tests for critical fixes
+
+    def test_replace_in_file_writes_to_container(self):
+        """Test replace_in_file() writes script to container filesystem, not host /tmp.
+
+        This verifies the fix for the critical bug where temp files created on host
+        don't exist in Docker container.
+        """
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write("line1\nline2\n")
+            temp_file = f.name
+
+        try:
+            self.mock_env.files[temp_file] = "line1\nline2\n"
+            # Mock the execute calls to verify script is written to /testbed, not /tmp
+            script_written = False
+            script_path_used = None
+
+            def mock_execute(cmd):
+                nonlocal script_written, script_path_used
+                if "python3 -c" in cmd and "base64" in cmd:
+                    # Script write command
+                    script_written = True
+                    # Verify it's writing to /testbed, not /tmp
+                    self.assertIn("/testbed/.agent_replace_script.py", cmd)
+                    return ""
+                elif "python3 /testbed/.agent_replace_script.py" in cmd:
+                    # Script execution
+                    script_path_used = "/testbed/.agent_replace_script.py"
+                    return "Successfully replaced lines 1 to 1 (1 lines) in test.py"
+                elif "rm -f" in cmd:
+                    # Cleanup
+                    return ""
+                return ""
+
+            self.mock_env.execute = mock_execute
+            result = self.env_wrapper.replace_in_file(temp_file, 1, 1, "new\n")
+
+            # Verify script was written to container filesystem
+            self.assertTrue(script_written, "Script should be written to container")
+            self.assertEqual(script_path_used, "/testbed/.agent_replace_script.py")
+            self.assertIn("Successfully replaced", result)
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_replace_in_file_temp_file_error_message(self):
+        """Test replace_in_file() provides helpful error for temp file issues."""
+        # Simulate the old bug where temp file doesn't exist in container
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=ValueError("python3: can't open file '/tmp/tmp123.py': [Errno 2] No such file or directory")):
+            result = self.env_wrapper.replace_in_file("test.py", 1, 1, "content")
+            self.assertIn("Temporary script file not found in container", result)
+            self.assertIn("try the replace_in_file() call again", result)
+
+    def test_stage_changes(self):
+        """Test stage_changes() stages and verifies changes."""
+        # Test with changes
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=lambda cmd: " M test.py" if "status" in cmd else ""):
+            result = self.env_wrapper.stage_changes()
+            self.assertIn("Changes staged successfully", result)
+            self.assertIn("test.py", result)
+
+        # Test without changes
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=lambda cmd: ""):
+            result = self.env_wrapper.stage_changes()
+            self.assertIn("No changes to stage", result)
+            self.assertIn("replace_in_file", result)
+
+    def test_can_finish_ready(self):
+        """Test can_finish() when ready to finish."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=lambda cmd:
+                         " M test.py" if "status" in cmd
+                         else "diff --git a/test.py b/test.py\nindex 123..456" if "diff" in cmd
+                         else ""):
+            result = self.env_wrapper.can_finish()
+            self.assertIn("READY TO FINISH", result)
+            self.assertIn("test.py", result)
+
+    def test_can_finish_not_ready_no_changes(self):
+        """Test can_finish() when no changes exist."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=lambda cmd: ""):
+            result = self.env_wrapper.can_finish()
+            self.assertIn("CANNOT FINISH", result)
+            self.assertIn("No changes detected", result)
+            self.assertIn("replace_in_file", result)
+
+    def test_can_finish_not_ready_no_patch(self):
+        """Test can_finish() when changes exist but patch can't be generated."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         side_effect=lambda cmd:
+                         " M test.py" if "status" in cmd
+                         else "" if "diff" in cmd  # No valid patch
+                         else ""):
+            result = self.env_wrapper.can_finish()
+            self.assertIn("CANNOT FINISH", result)
+            self.assertIn("patch cannot be generated", result)
 
 
 if __name__ == '__main__':

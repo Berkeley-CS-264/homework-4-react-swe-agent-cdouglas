@@ -238,18 +238,33 @@ except Exception as e:
     print(f"Error writing file: {{e}}", file=sys.stderr)
     sys.exit(1)
 """
-            # Write script to temporary file to avoid shell escaping issues
-            # This fixes the critical bug where repr() caused bash syntax errors
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-                f.write(python_script)
-                temp_script = f.name
+            # Write script to container filesystem (not host /tmp)
+            # CRITICAL FIX: Temp files created on host don't exist in Docker container
+            # Write directly to container filesystem at /testbed using heredoc
+            script_path = "/testbed/.agent_replace_script.py"
+
+            # Use base64 encoding to safely pass script content through shell
+            # Then decode and write it in the container using Python
+            script_b64 = base64.b64encode(python_script.encode('utf-8')).decode('ascii')
+
+            # Write script to container using Python one-liner
+            # This avoids shell escaping issues with the script content
+            write_cmd = f"python3 -c \"import base64; open('{script_path}', 'w').write(base64.b64decode('{script_b64}').decode('utf-8'))\""
+            write_result = self.env.execute(write_cmd)
+
+            # Check if write succeeded (ignore output, just check for exceptions)
+            if isinstance(write_result, dict):
+                write_result = write_result.get("output", "") or write_result.get("stdout", "")
+                # Check for error indicators
+                if write_result and ("Error" in write_result or "error" in write_result.lower() or "Traceback" in write_result):
+                    raise ValueError(f"Failed to write script to container: {write_result}")
 
             try:
-                output = self.env.execute(f"python3 {temp_script}")
+                output = self.env.execute(f"python3 {script_path}")
             finally:
-                # Clean up temp file
+                # Clean up script file in container
                 try:
-                    os.unlink(temp_script)
+                    self.env.execute(f"rm -f {script_path}")
                 except:
                     pass
 
@@ -264,7 +279,15 @@ except Exception as e:
         except TimeoutError:
             raise ValueError(f"Timeout replacing lines in {file_path}")
         except Exception as e:
-            raise ValueError(f"Error replacing lines in {file_path}: {str(e)}")
+            error_msg = str(e)
+            # Provide helpful error message for temp file issues
+            if "No such file" in error_msg and ("/tmp/" in error_msg or "can't open file" in error_msg):
+                return (f"Error: Temporary script file not found in container. "
+                       f"This indicates a system error with file operations. "
+                       f"Please try the replace_in_file() call again. "
+                       f"If the problem persists, you may need to use run_bash_cmd() "
+                       f"to manually edit the file. Original error: {error_msg}")
+            raise ValueError(f"Error replacing lines in {file_path}: {error_msg}")
 
     def grep(self, pattern: str, file_pattern: str = "*", case_sensitive: bool = True) -> str:
         """
@@ -597,6 +620,169 @@ except Exception as e:
             return f"Repository: {repo_name}\nRoot directory: {root_dir}"
         except Exception as e:
             return f"Repository: {self.instance.get('repo', 'unknown')}\nRoot directory: /testbed\n(Error getting details: {e})"
+
+    def stage_changes(self) -> str:
+        """
+        Explicitly stage all file changes and verify they're detected.
+
+        This tool ensures that all modifications are staged for git and can be
+        included in the generated patch. Use this if verify_changes() shows
+        changes but they're not being detected.
+
+        Returns:
+            Confirmation of staged changes or warning if no changes exist
+        """
+        try:
+            # Stage all changes
+            add_result = self.env.execute("git add -A")
+            if isinstance(add_result, dict):
+                add_result = add_result.get("output", "") or add_result.get("stdout", "")
+
+            # Verify changes are staged
+            status = self.env.execute("git status --short")
+            if isinstance(status, dict):
+                status = status.get("output", "") or status.get("stdout", "")
+
+            if status and status.strip():
+                return f"Changes staged successfully:\n{status}"
+            else:
+                return "WARNING: No changes to stage. Use replace_in_file() to make code changes before staging."
+        except Exception as e:
+            return f"Error staging changes: {e}"
+
+    def can_finish(self) -> str:
+        """
+        Check if agent is ready to finish (has made changes and can generate patch).
+
+        This tool validates that:
+        1. File changes exist
+        2. Changes are staged
+        3. A valid patch can be generated
+
+        Call this before finish() to ensure you're ready to complete the task.
+
+        Returns:
+            Status message indicating if agent can finish or what's missing
+        """
+        try:
+            # Check for changes
+            status = self.env.execute("git status --short")
+            if isinstance(status, dict):
+                status = status.get("output", "") or status.get("stdout", "")
+
+            if not status or not status.strip():
+                return ("CANNOT FINISH: No changes detected.\n\n"
+                       "You must use replace_in_file() to make actual code changes before calling finish().\n"
+                       "Text descriptions in finish() do NOT create patches - only file edits do.")
+
+            # Stage changes
+            self.env.execute("git add -A")
+
+            # Check if patch can be generated
+            patch = self.env.execute("git diff --cached")
+            if isinstance(patch, dict):
+                patch = patch.get("output", "") or patch.get("stdout", "")
+
+            if patch and patch.strip().startswith("diff --git"):
+                return (f"READY TO FINISH: Changes detected and patch can be generated.\n\n"
+                       f"Modified files:\n{status}\n\n"
+                       "You can now call finish() to complete the task.")
+            else:
+                return ("CANNOT FINISH: Changes exist but patch cannot be generated.\n\n"
+                       "This may indicate the changes weren't properly saved or staged.\n"
+                       "Try calling stage_changes() and verify_changes() to diagnose the issue.")
+        except Exception as e:
+            return f"Error checking finish readiness: {e}"
+
+    def show_code_structure(self, file_path: str) -> str:
+        """
+        Show the structure of a Python file (classes, functions, imports).
+
+        This helps understand code organization without reading the entire file.
+        Useful for large files or when you need to understand the file's structure.
+
+        Args:
+            file_path (str): Path to Python file (tolerates whitespace, relative paths)
+
+        Returns:
+            Summary of classes, functions, and key imports in the file
+        """
+        try:
+            # Normalize file path
+            file_path = file_path.strip()
+            if not file_path:
+                raise ValueError("File path cannot be empty")
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+
+            # Read the file
+            content = self.show_file(file_path)
+            if not content:
+                return f"File {file_path} is empty or could not be read"
+
+            lines = content.split('\n')
+            structure = []
+            structure.append(f"File: {file_path}\n")
+
+            # Extract imports
+            imports = []
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith('import ') or stripped.startswith('from '):
+                    imports.append(f"  Line {i}: {stripped}")
+
+            if imports:
+                structure.append("Imports:")
+                structure.extend(imports[:20])  # Limit to first 20 imports
+                if len(imports) > 20:
+                    structure.append(f"  ... and {len(imports) - 20} more imports")
+                structure.append("")
+
+            # Extract classes and functions
+            classes = []
+            functions = []
+            in_class = False
+            indent_level = 0
+
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#'):
+                    continue
+
+                # Check indentation level (simple heuristic)
+                line_indent = len(line) - len(line.lstrip())
+
+                # Check for class definition
+                if stripped.startswith('class '):
+                    class_name = stripped.split('(')[0].replace('class ', '').strip()
+                    classes.append(f"  Line {i}: class {class_name}")
+                    in_class = True
+                    indent_level = line_indent
+                # Check for function definition
+                elif stripped.startswith('def '):
+                    func_name = stripped.split('(')[0].replace('def ', '').strip()
+                    # If indentation is same or less than class, it's a module-level function
+                    if not in_class or line_indent <= indent_level:
+                        functions.append(f"  Line {i}: def {func_name}")
+                        if line_indent <= indent_level:
+                            in_class = False  # Reset if we're back at module level
+
+            if classes:
+                structure.append("Classes:")
+                structure.extend(classes[:30])  # Limit to first 30 classes
+                if len(classes) > 30:
+                    structure.append(f"  ... and {len(classes) - 30} more classes")
+                structure.append("")
+
+            if functions:
+                structure.append("Functions:")
+                structure.extend(functions[:30])  # Limit to first 30 functions
+                if len(functions) > 30:
+                    structure.append(f"  ... and {len(functions) - 30} more functions")
+
+            return "\n".join(structure) if structure else f"Could not extract structure from {file_path}"
+        except Exception as e:
+            return f"Error analyzing code structure: {str(e)}"
 
 class DumbEnvironment:
     """
