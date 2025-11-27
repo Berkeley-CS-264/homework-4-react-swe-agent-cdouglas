@@ -99,6 +99,7 @@ Your task is to modify the code so that the issue below is resolved and all rele
 6. **Complete the Task**
    - **Before calling finish(), use `can_finish()` to validate you're ready**
    - Only call `finish()` after verifying changes exist AND tests pass
+   - **If you reach max_steps without making changes, the system will detect this and you will not produce a valid patch**
    - The `finish()` result parameter is for logging only
    - Actual patch is generated automatically from file edits via git
    - **If `verify_changes()` shows "No changes detected", the system will reject finish()**
@@ -430,8 +431,17 @@ Your task is to modify the code so that the issue below is resolved and all rele
                 # Add error as observation
                 self.add_message("user", f"Error executing {function_call['name']}: {str(e)}")
         
-        # Max steps reached
-        return self.finish("Max steps reached")
+        # Max steps reached - check if changes exist before finishing
+        if "verify_changes" in self.function_map:
+            changes_status = self.function_map["verify_changes"]()
+            if "No changes detected" in changes_status or (not changes_status.strip() or changes_status.strip() == "No changes detected"):
+                # No changes - return a message indicating failure
+                return self.finish("Max steps reached - no changes made")
+            # Changes exist - allow finish
+            return self.finish("Max steps reached")
+        else:
+            # If verify_changes not available, finish anyway (shouldn't happen)
+            return self.finish("Max steps reached")
 
     def message_id_to_context(self, message_id: int) -> str:
         """

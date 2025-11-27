@@ -69,6 +69,13 @@ class SWEEnvironment:
             if patch_output and patch_output.strip().startswith("diff --git"):
                 return patch_output.strip()
 
+            # If no valid patch, check if this was due to max_steps
+            if result and "Max steps reached" in result:
+                # This indicates the agent reached max_steps - log for debugging
+                # but still return empty string (valid format)
+                # The empty string will be saved, which is correct - no changes were made
+                pass
+
             # If no valid patch, check git status to understand why (for debugging)
             # But don't include this in the return value - just return empty string
             status = self.env.execute("git status --short")
