@@ -115,49 +115,6 @@ Your task is to modify the code so that the issue below is resolved and all rele
 - **If tests fail, debug and fix before finishing**
 - **The system will REJECT finish() if no changes are detected - you cannot finish without making file edits**
 
-## Common Fix Patterns (From Successful Instances)
-
-**Metaclasses and Descriptors:**
-- Properties: Cannot assign `__doc__` directly. Create new property: `property(fget, fset, fdel, doc=inherited_doc)`
-- Classmethod/staticmethod: Access underlying function via `__func__` attribute
-- Use `base.__dict__.get(key)` to avoid descriptor binding side-effects
-
-**Variable Scoping:**
-- Preserve state before try/except blocks if you need to restore on exception
-- Use explicit variable assignments rather than relying on loop variables
-- Extract values from collections before use in exception handlers
-
-**Exception Handling:**
-- Always restore previous state in finally blocks or exception handlers
-- Save handlers/state before operations that might fail
-
-**Import Organization:**
-- Plain `import` statements should come before `from ... import` statements
-- Sort within each group alphabetically
-- Use a custom sort key: `(is_from, module_name)` where `is_from=1` for "from" imports
-
-**Environment Variables:**
-- Prefer environment variables over temporary files when possible
-- Use `os.environ.copy()` and modify the copy for subprocess calls
-- Pass `env` parameter to `subprocess.run()` instead of modifying global environment
-
-**Reflected Operations:**
-- Implement `__rmul__`, `__radd__`, etc. for operations like `scalar * obj`
-- Delegate to the main method: `def __rmul__(self, other): return self.__mul__(other)`
-
-**Collection Completeness:**
-- Check all sources where items might be stored (including `remainder`, `_transformers`, etc.)
-- Look for hidden attributes that might contain related objects
-
-**Generator Deduplication:**
-- Track yielded items to avoid duplicates
-- Use a dictionary to store results: `results = {}` and `order = []`
-- Yield each item only once with its final state
-
-**Framework-Specific APIs:**
-- Use app-specific model access: `apps.get_app_config(app_label).get_models()`
-- Be aware of subtle differences between similar APIs
-
 ## Tool Usage Best Practices
 
 **Before Making Changes:**
@@ -192,33 +149,6 @@ Your task is to modify the code so that the issue below is resolved and all rele
 2. Look for error types, messages, and file locations in the analysis
 3. Re-read the test to understand what it's actually checking
 4. Check if your fix addresses the root cause, not just symptoms
-
-## Common Failure Patterns (From Unresolved Instances)
-
-**Test Expectations vs. Implementation:**
-- Some issues require understanding subtle test expectations (e.g., django-12406: radio button selection)
-- Read the test carefully to understand what behavior is expected vs. what's happening
-- Test failures may indicate the fix is incomplete or addresses the wrong aspect
-
-**Complex Framework Behavior:**
-- Some issues involve complex framework internals (e.g., django-13297: lazy object handling)
-- Understand the framework's deprecation mechanisms and backward compatibility requirements
-- Test with actual rendering/execution, not just context creation
-
-**Thread and Resource Management:**
-- Thread lifecycle issues require understanding daemon threads and cleanup (e.g., django-14011)
-- Database connections in threads need proper cleanup
-- Consider thread synchronization and resource management
-
-**Regex and Pattern Matching:**
-- Regex patterns may need anchors (`^`, `$`) to match correctly (e.g., sphinx-9230)
-- Test regex patterns with various inputs to ensure they match correctly
-- Consider whitespace and edge cases in pattern matching
-
-**Code Structure Understanding:**
-- Use `show_code_structure()` for large files to understand organization
-- Look for related classes/functions that might need similar changes
-- Understand inheritance hierarchies and method resolution order
 
 ## When Stuck
 - Re-read the issue description carefully - you might have missed a detail
