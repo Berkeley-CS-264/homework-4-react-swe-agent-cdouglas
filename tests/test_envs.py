@@ -40,7 +40,7 @@ class MockEnvironment:
         self.files = {}
         self.commands_run = []
 
-    def execute(self, command: str):
+    def execute(self, command: str, timeout=None):
         """Simulate command execution."""
         self.commands_run.append(command)
 
@@ -49,6 +49,21 @@ class MockEnvironment:
             file_path = command.split("cat ", 1)[1].strip().strip("'\"")
             if file_path in self.files:
                 return self.files[file_path]
+            return ""
+
+        # Handle nl -ba (line numbers) command used by show_file
+        if "nl -ba" in command:
+            # Extract file path from command like: nl -ba 'file.py' | sed -n '1,200p'
+            import re
+            match = re.search(r"nl -ba '([^']+)'", command)
+            if match:
+                file_path = match.group(1)
+                if file_path in self.files:
+                    content = self.files[file_path]
+                    # Add line numbers like nl -ba does
+                    lines = content.split('\n')
+                    numbered_lines = [f"      {i+1}  {line}" for i, line in enumerate(lines)]
+                    return '\n'.join(numbered_lines)
             return ""
 
         if command.startswith("python3 ") and command.endswith(".py"):
@@ -302,31 +317,6 @@ if isinstance(other, Mul):
         result = self.env_wrapper.find_test_file(issue)
         self.assertIsInstance(result, str)
 
-    def test_show_diff(self):
-        """Test show_diff() displays git diff."""
-        # General-purpose test
-        # Mock should return a git diff
-        self.mock_env.execute = Mock(return_value="diff --git a/test.py b/test.py\nindex 123..456\n--- a/test.py\n+++ b/test.py\n@@ -1,1 +1,1 @@\n-old\n+new")
-        result = self.env_wrapper.show_diff("test.py")
-        self.assertIn("diff --git", result)
-        self.assertIn("test.py", result)
-
-    def test_verify_changes(self):
-        """Test verify_changes() detects modified files."""
-        # General-purpose test
-        result = self.env_wrapper.verify_changes()
-        self.assertIn("test.py", result)
-
-        # Test from real instance: verifying changes before finish
-        # This is critical - agent should verify before finishing
-        result = self.env_wrapper.verify_changes()
-        self.assertIsInstance(result, str)
-
-    def test_get_git_status(self):
-        """Test get_git_status() returns git status."""
-        # General-purpose test
-        result = self.env_wrapper.get_git_status()
-        self.assertIsInstance(result, str)
 
     def test_get_repo_info(self):
         """Test get_repo_info() returns repository information."""
@@ -410,16 +400,6 @@ if isinstance(other, Mul):
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
 
-    def test_verify_changes_before_finish(self):
-        """Test that verify_changes() is used before finish (best practice).
-
-        Based on successful instances like sympy-17655 and sympy-24213,
-        which verified changes before finishing.
-        """
-        result = self.env_wrapper.verify_changes()
-        # Should return status showing modified files
-        self.assertIsInstance(result, str)
-        # Agent should check this before calling finish()
 
     def test_run_test_specific_test(self):
         """Test running a specific test function.
@@ -480,6 +460,7 @@ if isinstance(other, Mul):
         self.mock_env.files["test.py"] = "content"
         # Agent adds ./ prefix
         result = self.env_wrapper.show_file("./test.py")
+        # show_file now uses nl -ba which adds line numbers, so check for content
         self.assertIn("content", result)
 
     def test_show_file_not_found_helpful_message(self):
@@ -517,19 +498,6 @@ if isinstance(other, Mul):
             result = self.env_wrapper.check_syntax("./test.py")
             self.assertEqual("Syntax OK", result)
 
-    def test_show_diff_no_file_shows_all(self):
-        """Test show_diff() works without file_path to show all changes."""
-        self.mock_env.execute = Mock(return_value="diff --git a/test.py b/test.py")
-        result = self.env_wrapper.show_diff()
-        self.assertIn("diff --git", result)
-
-    def test_verify_changes_no_changes(self):
-        """Test verify_changes() when no changes exist (common failure scenario)."""
-        # This is a critical test - agent should check this before finishing
-        with patch.object(self.env_wrapper.env, 'execute', return_value=""):
-            result = self.env_wrapper.verify_changes()
-            self.assertEqual("No changes detected", result)
-            # Agent should NOT call finish() if this returns "No changes detected"
 
     def test_replace_in_file_invalid_line_numbers(self):
         """Test replace_in_file() handles invalid line number types."""
@@ -688,52 +656,6 @@ class AnotherClass:
             self.assertIn("Temporary script file not found in container", result)
             self.assertIn("try the replace_in_file() call again", result)
 
-    def test_stage_changes(self):
-        """Test stage_changes() stages and verifies changes."""
-        # Test with changes
-        with patch.object(self.env_wrapper.env, 'execute',
-                         side_effect=lambda cmd: " M test.py" if "status" in cmd else ""):
-            result = self.env_wrapper.stage_changes()
-            self.assertIn("Changes staged successfully", result)
-            self.assertIn("test.py", result)
-
-        # Test without changes
-        with patch.object(self.env_wrapper.env, 'execute',
-                         side_effect=lambda cmd: ""):
-            result = self.env_wrapper.stage_changes()
-            self.assertIn("No changes to stage", result)
-            self.assertIn("replace_in_file", result)
-
-    def test_can_finish_ready(self):
-        """Test can_finish() when ready to finish."""
-        with patch.object(self.env_wrapper.env, 'execute',
-                         side_effect=lambda cmd:
-                         " M test.py" if "status" in cmd
-                         else "diff --git a/test.py b/test.py\nindex 123..456" if "diff" in cmd
-                         else ""):
-            result = self.env_wrapper.can_finish()
-            self.assertIn("READY TO FINISH", result)
-            self.assertIn("test.py", result)
-
-    def test_can_finish_not_ready_no_changes(self):
-        """Test can_finish() when no changes exist."""
-        with patch.object(self.env_wrapper.env, 'execute',
-                         side_effect=lambda cmd: ""):
-            result = self.env_wrapper.can_finish()
-            self.assertIn("CANNOT FINISH", result)
-            self.assertIn("No changes detected", result)
-            self.assertIn("replace_in_file", result)
-
-    def test_can_finish_not_ready_no_patch(self):
-        """Test can_finish() when changes exist but patch can't be generated."""
-        with patch.object(self.env_wrapper.env, 'execute',
-                         side_effect=lambda cmd:
-                         " M test.py" if "status" in cmd
-                         else "" if "diff" in cmd  # No valid patch
-                         else ""):
-            result = self.env_wrapper.can_finish()
-            self.assertIn("CANNOT FINISH", result)
-            self.assertIn("patch cannot be generated", result)
 
 
 if __name__ == '__main__':

@@ -40,6 +40,10 @@ class ReactAgent:
         # Registered tools
         self.function_map: Dict[str, Callable] = {}
 
+        # Track agent actions for finish validation
+        self.made_edit: bool = False
+        self.ran_tests_after_edit: bool = False
+
         # Set up the initial structure of the history
         # Create required root nodes and a user node (task)
         initial_system_content = """You are an autonomous software engineer working in a local checkout of a repository.
@@ -70,6 +74,20 @@ Your task is to modify the code so that the issue below is resolved and all rele
    - why it fixes the issue,
    - which tests you ran.
 
+# First step
+On your very first Action, you MUST:
+1. Call get_repo_info() to see the repo name and root directory.
+2. Then call either:
+   - find_test_file() to list likely test files, or
+   - grep() to search for a key symbol or phrase from the issue.
+Do NOT run broad commands like "pytest" or "ls -R" as your first action.
+
+# When choosing tests:
+- Prefer narrow tests over the whole suite:
+  - If you know the test file, use run_test(test_path="path/to/test_file.py").
+  - If you only know a keyword, use run_test(test_name="keyword") to run a subset with -k.
+- Avoid running the entire test suite repeatedly. Only do that near the end, if needed.
+
 # When Stuck
 - Re-read the issue description carefully; you may have missed a key detail.
 - Use find_test_file() to locate likely relevant tests.
@@ -80,6 +98,7 @@ Your task is to modify the code so that the issue below is resolved and all rele
 - Add temporary debug prints using replace_in_file() if needed to understand the control flow.
 - Consider edge cases: empty inputs, None values, type mismatches, boundary conditions, etc.
 - Remember that some fixes require changes in more than one place (e.g., both implementation and helper utilities).
+- If you significantly change a Python file, call check_syntax(file_path) on it before running tests.
 
 # Critical Rules
 - Always make real code changes using replace_in_file(); your explanation in finish() does NOT modify files.
@@ -90,6 +109,7 @@ Your task is to modify the code so that the issue below is resolved and all rele
 - Do NOT modify existing tests or test data unless the issue explicitly requires it.
 - Prefer the smallest change that makes the tests pass and matches the issue description.
 - Keep your Thought concise (1–3 short sentences) and then call exactly ONE tool in each Action.
+- For large files, prefer show_file_snippet(path, start_line, end_line) to view just the relevant part, then use those line numbers with replace_in_file().
 
 # Example pattern (do NOT hard-code these paths; they are just an example):
 
@@ -280,9 +300,9 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
                 self.add_message("user", f"Error parsing function call: {str(e)}")
                 continue
 
-            # after parse, before executing tool:
+            # Check if finish was called
             if function_call["name"] == "finish":
-                # enforce simple guards
+                # Enforce simple guards
                 if not self.made_edit:
                     self.add_message(
                         "user",
@@ -316,6 +336,7 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
                     if self.made_edit:
                         self.ran_tests_after_edit = True
 
+                # Add tool result as observation (user message)
                 self.add_message("user", f"Observation: {result}")
             except Exception as e:
                 # Add error as observation

@@ -19,6 +19,18 @@ class SWEEnvironment:
         self.env = get_sb_environment(instance)
         self.instance = instance  # Store instance for test execution
      
+    def _normalize_output(output) -> str:
+        if isinstance(output, dict):
+            output = output.get("output", "") or output.get("stdout", "") or ""
+        if not isinstance(output, str):
+            output = str(output)
+        # Truncate to last 300 lines
+        lines = output.splitlines()
+        if len(lines) > 300:
+            lines = ["[truncated to last 300 lines] ..."] + lines[-300:]
+        return "\n".join(lines)
+
+
     # -------------------- REQUIRED TOOLS --------------------
     def run_bash_cmd(self, command: str) -> str:
         """
@@ -43,7 +55,7 @@ class SWEEnvironment:
             raise ValueError(output)
         except TimeoutError:
             raise ValueError("TimeoutError")
-        return output
+        return self._normalize_output(output)
     
     def generate_patch(self, result: str) -> str:
         """
@@ -405,7 +417,7 @@ except Exception as e:
             if isinstance(output, dict):
                 output = output.get("output", "") or output.get("stdout", "")
 
-            return output
+            return self._normalize_output(output)
         except Exception as e:
             error_msg = str(e)
             # Provide helpful error message
@@ -604,9 +616,21 @@ except Exception as e:
             structure = []
             structure.append(f"File: {file_path}\n")
 
+            # Strip line numbers if present (from nl -ba output format: "      1  content")
+            # Format is typically whitespace, number, whitespace, content
+            import re
+            stripped_lines = []
+            for line in lines:
+                # Match pattern like "      1  import os" or "     10  def func():"
+                match = re.match(r'^\s+\d+\s+(.*)$', line)
+                if match:
+                    stripped_lines.append(match.group(1))
+                else:
+                    stripped_lines.append(line)
+
             # Extract imports
             imports = []
-            for i, line in enumerate(lines, 1):
+            for i, line in enumerate(stripped_lines, 1):
                 stripped = line.strip()
                 if stripped.startswith('import ') or stripped.startswith('from '):
                     imports.append(f"  Line {i}: {stripped}")
@@ -624,7 +648,7 @@ except Exception as e:
             in_class = False
             indent_level = 0
 
-            for i, line in enumerate(lines, 1):
+            for i, line in enumerate(stripped_lines, 1):
                 stripped = line.strip()
                 if not stripped or stripped.startswith('#'):
                     continue
@@ -663,6 +687,33 @@ except Exception as e:
             return "\n".join(structure) if structure else f"Could not extract structure from {file_path}"
         except Exception as e:
             return f"Error analyzing code structure: {str(e)}"
+
+    def show_file_snippet(self, file_path: str, start_line: int = 1, end_line: int = 200) -> str:
+        """
+        Show a range of lines from a file with line numbers.
+
+        Args:
+            file_path (str): Path to the file
+            start_line (int): 1-indexed starting line (inclusive)
+            end_line (int): 1-indexed ending line (inclusive)
+
+        Returns:
+            The requested lines with line numbers, similar to show_file().
+        """
+        try:
+            file_path = file_path.strip()
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+            start_line = max(1, int(start_line))
+            end_line = max(start_line, int(end_line))
+            cmd = f"nl -ba '{file_path}' | sed -n '{start_line},{end_line}p'"
+            output = self.env.execute(cmd)
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+            return output
+        except Exception as e:
+            raise ValueError(f"Error showing file snippet: {e}")
+
 
 class DumbEnvironment:
     """
