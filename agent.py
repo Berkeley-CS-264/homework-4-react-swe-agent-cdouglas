@@ -83,7 +83,10 @@ Your task is to modify the code so that the issue below is resolved and all rele
 
 # Critical Rules
 - Always make real code changes using replace_in_file(); your explanation in finish() does NOT modify files.
-- Always run at least one test (run_test() or run_bash_cmd("pytest ...")) after making changes.
+- Do NOT modify files using run_bash_cmd(). Use replace_in_file() for all code changes so they are captured in the final patch.
+- Before your FIRST call to replace_in_file(), identify and run at least one failing test using run_test() or run_bash_cmd("pytest ...").
+- AFTER every call to replace_in_file(), run at least one test again.
+- Do NOT call finish() if the last tests you ran are still failing, or if you have not run any tests since your last code change.
 - Do NOT modify existing tests or test data unless the issue explicitly requires it.
 - Prefer the smallest change that makes the tests pass and matches the issue description.
 - Keep your Thought concise (1–3 short sentences) and then call exactly ONE tool in each Action.
@@ -276,19 +279,43 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
                 # If parsing fails, add error as observation and continue
                 self.add_message("user", f"Error parsing function call: {str(e)}")
                 continue
-            
-            # Check if finish was called
+
+            # after parse, before executing tool:
             if function_call["name"] == "finish":
+                # enforce simple guards
+                if not self.made_edit:
+                    self.add_message(
+                        "user",
+                        "You have not modified any files yet. Use replace_in_file() to change the code before calling finish()."
+                    )
+                    continue
+                if not self.ran_tests_after_edit:
+                    self.add_message(
+                        "user",
+                        "You have not run tests since your last code change. Run tests with run_test() or run_bash_cmd('pytest ...') before calling finish()."
+                    )
+                    continue
                 result = self.function_map["finish"](**function_call["arguments"])
                 return result
-            
+
             # Execute the tool
             try:
                 if function_call["name"] not in self.function_map:
                     raise ValueError(f"Unknown function: {function_call['name']}")
                 
                 result = self.function_map[function_call["name"]](**function_call["arguments"])
-                # Add tool result as observation (user message)
+
+                # Update flags
+                if function_call["name"] == "replace_in_file":
+                    self.made_edit = True
+                    self.ran_tests_after_edit = False
+                elif function_call["name"] in ("run_test",) or (
+                    function_call["name"] == "run_bash_cmd"
+                    and "pytest" in function_call["arguments"].get("command", "")
+                ):
+                    if self.made_edit:
+                        self.ran_tests_after_edit = True
+
                 self.add_message("user", f"Observation: {result}")
             except Exception as e:
                 # Add error as observation
