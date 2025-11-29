@@ -1,6 +1,7 @@
 from utils import get_sb_environment
 import subprocess
 import swebench
+import logging
 
 class LimitsExceeded(Exception):
     """Raised when the agent has reached its step limit."""
@@ -56,7 +57,9 @@ class SWEEnvironment:
         """
         try:
             # Ensure all changes are staged
-            add_result = self.env.execute("git add -A")
+            # Use longer timeout for git add -A as it can be slow with large repos or git hooks
+            # Disable git hooks to avoid delays from pre-commit hooks, etc.
+            add_result = self.env.execute("git -c core.hooksPath=/dev/null add -A", timeout=120)
             if isinstance(add_result, dict):
                 add_result = add_result.get("output", "") or add_result.get("stdout", "")
             
@@ -74,7 +77,7 @@ class SWEEnvironment:
                 # This indicates the agent reached max_steps - log for debugging
                 # but still return empty string (valid format)
                 # The empty string will be saved, which is correct - no changes were made
-                pass
+                logging.warning("Agent reached max_steps limit - no patch generated")
 
             # If no valid patch, check git status to understand why (for debugging)
             # But don't include this in the return value - just return empty string
@@ -82,11 +85,18 @@ class SWEEnvironment:
             if isinstance(status, dict):
                 status = status.get("output", "") or status.get("stdout", "")
 
+            # Log that no valid patch was generated
+            if status and status.strip():
+                logging.warning(f"No valid patch generated - git status: {status.strip()}")
+            else:
+                logging.warning("No valid patch generated - no changes detected in repository")
+
             # Return empty string (valid empty patch) instead of text description
             return ""
         except Exception as e:
             # Log error but return empty patch (not error text)
             # Empty string is a valid patch format that evaluation harness accepts
+            logging.error(f"Exception while generating patch: {e}", exc_info=True)
             return ""
 
     # -------------------- OPTIONAL TOOLS --------------------
@@ -641,7 +651,8 @@ except Exception as e:
         """
         try:
             # Stage all changes
-            add_result = self.env.execute("git add -A")
+            # Use longer timeout and disable git hooks to avoid delays
+            add_result = self.env.execute("git -c core.hooksPath=/dev/null add -A", timeout=120)
             if isinstance(add_result, dict):
                 add_result = add_result.get("output", "") or add_result.get("stdout", "")
 
@@ -683,7 +694,8 @@ except Exception as e:
                        "Text descriptions in finish() do NOT create patches - only file edits do.")
 
             # Stage changes
-            self.env.execute("git add -A")
+            # Use longer timeout and disable git hooks to avoid delays
+            self.env.execute("git -c core.hooksPath=/dev/null add -A", timeout=120)
 
             # Check if patch can be generated
             patch = self.env.execute("git diff --cached")
