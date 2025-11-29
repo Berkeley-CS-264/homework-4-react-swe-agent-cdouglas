@@ -120,7 +120,9 @@ class SWEEnvironment:
             if file_path.startswith('./'):
                 file_path = file_path[2:]
 
-            output = self.env.execute(f"cat '{file_path}'")
+            # output = self.env.execute(f"cat '{file_path}'")
+            # show line numbers
+            output = self.env.execute(f"nl -ba '{file_path}' | sed -n '1,200p'")
 
             # Handle case where execute returns a dict instead of string
             if isinstance(output, dict):
@@ -547,72 +549,6 @@ except Exception as e:
         except Exception as e:
             raise ValueError(f"Error finding test files: {str(e)}")
 
-    def show_diff(self, file_path: str = None) -> str:
-        """
-        Show the git diff for a file to see what has changed.
-
-        Args:
-            file_path (str, optional): Path to the file. If None or empty, shows diff for all changed files.
-                                      Tolerates leading/trailing whitespace, relative paths.
-
-        Returns:
-            Git diff output showing changes
-        """
-        try:
-            if file_path:
-                # Normalize file path
-                file_path = file_path.strip()
-                if file_path.startswith('./'):
-                    file_path = file_path[2:]
-                cmd = f"git diff '{file_path}' 2>&1"
-            else:
-                # Show diff for all changed files
-                cmd = "git diff 2>&1"
-
-            output = self.env.execute(cmd)
-
-            if isinstance(output, dict):
-                output = output.get("output", "") or output.get("stdout", "")
-
-            if not output or "fatal" in output.lower():
-                if file_path:
-                    return f"No changes detected for '{file_path}' (file may not be tracked or no changes made)"
-                return "No changes detected (no files have been modified)"
-
-            return output
-        except Exception as e:
-            raise ValueError(f"Error showing diff: {str(e)}")
-
-    def verify_changes(self) -> str:
-        """
-        Verify that file changes exist and are staged.
-
-        Returns:
-            Git status output showing modified files, or "No changes detected"
-        """
-        try:
-            status = self.env.execute("git status --short")
-            if isinstance(status, dict):
-                status = status.get("output", "") or status.get("stdout", "")
-            return status if status else "No changes detected"
-        except Exception as e:
-            return f"Error checking status: {e}"
-
-    def get_git_status(self) -> str:
-        """
-        Get detailed git status to help debug why changes aren't detected.
-
-        Returns:
-            Full git status output
-        """
-        try:
-            status = self.env.execute("git status")
-            if isinstance(status, dict):
-                status = status.get("output", "") or status.get("stdout", "")
-            return status if status else "No git status available"
-        except Exception as e:
-            return f"Error getting git status: {e}"
-
     def get_repo_info(self) -> str:
         """Get repository name and root directory information.
 
@@ -637,81 +573,6 @@ except Exception as e:
             return f"Repository: {repo_name}\nRoot directory: {root_dir}"
         except Exception as e:
             return f"Repository: {self.instance.get('repo', 'unknown')}\nRoot directory: /testbed\n(Error getting details: {e})"
-
-    def stage_changes(self) -> str:
-        """
-        Explicitly stage all file changes and verify they're detected.
-
-        This tool ensures that all modifications are staged for git and can be
-        included in the generated patch. Use this if verify_changes() shows
-        changes but they're not being detected.
-
-        Returns:
-            Confirmation of staged changes or warning if no changes exist
-        """
-        try:
-            # Stage all changes
-            # Use longer timeout and disable git hooks to avoid delays
-            add_result = self.env.execute("git -c core.hooksPath=/dev/null add -A", timeout=120)
-            if isinstance(add_result, dict):
-                add_result = add_result.get("output", "") or add_result.get("stdout", "")
-
-            # Verify changes are staged
-            status = self.env.execute("git status --short")
-            if isinstance(status, dict):
-                status = status.get("output", "") or status.get("stdout", "")
-
-            if status and status.strip():
-                return f"Changes staged successfully:\n{status}"
-            else:
-                return "WARNING: No changes to stage. Use replace_in_file() to make code changes before staging."
-        except Exception as e:
-            return f"Error staging changes: {e}"
-
-    def can_finish(self) -> str:
-        """
-        Check if agent is ready to finish (has made changes and can generate patch).
-
-        This tool validates that:
-        1. File changes exist
-        2. Changes are staged
-        3. A valid patch can be generated
-
-        Call this before finish() to ensure you're ready to complete the task.
-
-        Returns:
-            Status message indicating if agent can finish or what's missing
-        """
-        try:
-            # Check for changes
-            status = self.env.execute("git status --short")
-            if isinstance(status, dict):
-                status = status.get("output", "") or status.get("stdout", "")
-
-            if not status or not status.strip():
-                return ("CANNOT FINISH: No changes detected.\n\n"
-                       "You must use replace_in_file() to make actual code changes before calling finish().\n"
-                       "Text descriptions in finish() do NOT create patches - only file edits do.")
-
-            # Stage changes
-            # Use longer timeout and disable git hooks to avoid delays
-            self.env.execute("git -c core.hooksPath=/dev/null add -A", timeout=120)
-
-            # Check if patch can be generated
-            patch = self.env.execute("git diff --cached")
-            if isinstance(patch, dict):
-                patch = patch.get("output", "") or patch.get("stdout", "")
-
-            if patch and patch.strip().startswith("diff --git"):
-                return (f"READY TO FINISH: Changes detected and patch can be generated.\n\n"
-                       f"Modified files:\n{status}\n\n"
-                       "You can now call finish() to complete the task.")
-            else:
-                return ("CANNOT FINISH: Changes exist but patch cannot be generated.\n\n"
-                       "This may indicate the changes weren't properly saved or staged.\n"
-                       "Try calling stage_changes() and verify_changes() to diagnose the issue.")
-        except Exception as e:
-            return f"Error checking finish readiness: {e}"
 
     def show_code_structure(self, file_path: str) -> str:
         """

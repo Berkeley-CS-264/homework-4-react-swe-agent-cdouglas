@@ -186,7 +186,6 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
             "Repository Information": ["get_repo_info"],
             "File Operations": ["show_file", "replace_in_file", "grep", "find_files", "show_code_structure"],
             "Testing & Analysis": ["run_test", "analyze_test_failure", "find_test_file", "check_syntax"],
-            "Git & Verification": ["show_diff", "verify_changes", "get_git_status", "stage_changes", "can_finish"],
             "General": ["run_bash_cmd", "finish"],
         }
 
@@ -280,24 +279,6 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
             
             # Check if finish was called
             if function_call["name"] == "finish":
-                # MANDATORY: Verify changes exist before finishing
-                if "verify_changes" in self.function_map:
-                    changes_status = self.function_map["verify_changes"]()
-                    if "No changes detected" in changes_status or (not changes_status.strip() or changes_status.strip() == "No changes detected"):
-                        # Reject finish - no changes detected
-                        self.add_message("user",
-                            f"ERROR: Cannot finish - no changes detected!\n\n"
-                            f"Status: {changes_status}\n\n"
-                            f"You MUST use replace_in_file() to make actual code changes before calling finish(). "
-                            f"Text descriptions in finish() do NOT create patches - only file edits do.\n\n"
-                            f"Please:\n"
-                            f"1. Use replace_in_file() to modify the code\n"
-                            f"2. Call verify_changes() to confirm changes exist\n"
-                            f"3. Call can_finish() to validate you're ready\n"
-                            f"4. Only then call finish()")
-                        continue  # Don't finish, continue the loop
-
-                # Changes exist, allow finish
                 result = self.function_map["finish"](**function_call["arguments"])
                 return result
             
@@ -313,17 +294,8 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
                 # Add error as observation
                 self.add_message("user", f"Error executing {function_call['name']}: {str(e)}")
         
-        # Max steps reached - check if changes exist before finishing
-        if "verify_changes" in self.function_map:
-            changes_status = self.function_map["verify_changes"]()
-            if "No changes detected" in changes_status or (not changes_status.strip() or changes_status.strip() == "No changes detected"):
-                # No changes - return a message indicating failure
-                return self.finish("Max steps reached - no changes made")
-            # Changes exist - allow finish
-            return self.finish("Max steps reached")
-        else:
-            # If verify_changes not available, finish anyway (shouldn't happen)
-            return self.finish("Max steps reached")
+        # Max steps reached
+        return self.finish("Max steps reached")
 
     def message_id_to_context(self, message_id: int) -> str:
         """
