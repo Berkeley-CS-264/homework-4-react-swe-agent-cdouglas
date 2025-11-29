@@ -19,7 +19,7 @@ class SWEEnvironment:
         self.env = get_sb_environment(instance)
         self.instance = instance  # Store instance for test execution
      
-    def _normalize_output(output) -> str:
+    def _normalize_output(self, output) -> str:
         if isinstance(output, dict):
             output = output.get("output", "") or output.get("stdout", "") or ""
         if not isinstance(output, str):
