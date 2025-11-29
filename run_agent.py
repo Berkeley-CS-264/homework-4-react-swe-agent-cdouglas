@@ -79,17 +79,16 @@ def process_instance(
             env.grep,
             env.find_files,
             env.run_test,
-            # env.check_syntax,
             env.analyze_test_failure,
             env.find_test_file,
-            # env.show_diff,
-            # env.verify_changes,
-            # env.get_git_status,
-            # env.stage_changes,
-            # env.can_finish,
             env.show_code_structure,
+            # env.verify_changes,
+            # env.show_diff,
+            env.get_git_status,
+            env.stage_changes,
+            # env.can_finish,
         ])
-        
+
         # Run the agent
         output = agent.run(task, max_steps) 
         

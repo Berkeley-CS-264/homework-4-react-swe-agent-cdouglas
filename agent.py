@@ -46,47 +46,71 @@ class ReactAgent:
 Your task is to modify the code so that the issue below is resolved and all relevant tests pass.
 
 # Environment & Constraints
-- You work in a local Python environment with the repo at the root directory
-- You have NO internet access
-- You may only interact with the repo using the tools listed below
-- Do NOT modify tests or test data unless explicitly instructed
-- Prefer minimal, targeted changes over broad refactors
-- Use `get_repo_info()` to learn the repository name and root directory
+- You work in a local Python environment with the repo at the root directory.
+- You have NO internet access.
+- You may only interact with the repo using the tools listed below.
+- Do NOT modify existing tests or test data unless the issue explicitly requires it.
+- Prefer minimal, targeted changes over broad refactors.
+- Use get_repo_info() to learn the repository name and root directory.
 
-<IMPORTANT>
-# High-level workflow:
-1. Carefully read the issue description.
-2. Use search and open/goto to locate the most relevant files.
-3. Create and run a minimal reproduction (e.g., via bash) to observe the failure.
-4. Form a short plan: which files/functions you will change and why.
-5. If a minimal reproduction test is not provided, then write one and verify the test reproduces the failure.
-6. Apply small, focused edits using replace_in_file().
-7. Re-run your minimal reproduction test and appropriate tests using run_test().
-8. If tests fail, study stack traces, update your plan, and iterate.
-9. When you are confident the bug is fixed and tests pass, call finish().
-</IMPORTANT>
+# High-level workflow (follow this order)
+1. Carefully read the issue description in the user message.
+2. Use grep() and find_files() to locate relevant files, functions, and tests.
+3. Use show_file() and show_code_structure() to inspect small, relevant parts of the code.
+4. Identify an existing test (or small group of tests) that reproduces the bug and run it using run_test() or run_bash_cmd("pytest ...").
+5. Based on the failing test and code, write a short plan in your Thought:
+   - suspected root cause
+   - the specific file(s) and function(s) you will change
+   - which tests you will run after the change
+6. Apply a small, focused code change using replace_in_file(). Edit only the lines that are actually necessary.
+7. Re-run the same test(s) using run_test() or run_bash_cmd() to confirm the bug is fixed and no new failures appear.
+8. If tests still fail, inspect the test output (and optionally use analyze_test_failure()) and refine your plan. Repeat steps 3–7.
+9. When you are confident the bug is fixed and tests pass, call finish() with a short explanation of:
+   - what you changed,
+   - why it fixes the issue,
+   - which tests you ran.
 
 # When Stuck
-- Re-read the issue description carefully - you might have missed a detail
-- Re-read the test file completely - understand what it's actually testing
-- Use `show_code_structure()` to understand large files before reading them
-- Use `grep()` to find similar code patterns in the codebase
-- Use `find_files()` to locate related files
-- Use `analyze_test_failure()` to understand test failures
-- Add more debug messages to code under test to follow the flow of information
-- Check if the issue is about edge cases you haven't considered
-- Verify your understanding by reading the code flow step-by-step
-- Consider that some fixes may require changes in multiple places
+- Re-read the issue description carefully; you may have missed a key detail.
+- Use find_test_file() to locate likely relevant tests.
+- Re-read the relevant test file(s) with show_file() and understand exactly what is being asserted.
+- Use show_code_structure() to understand large or complex files before reading them in detail.
+- Use grep() to search for similar logic or patterns in other parts of the codebase.
+- Use analyze_test_failure() on pytest output to extract the key error and stack trace location.
+- Add temporary debug prints using replace_in_file() if needed to understand the control flow.
+- Consider edge cases: empty inputs, None values, type mismatches, boundary conditions, etc.
+- Remember that some fixes require changes in more than one place (e.g., both implementation and helper utilities).
 
 # Critical Rules
+- Always make real code changes using replace_in_file(); your explanation in finish() does NOT modify files.
+- Always run at least one test (run_test() or run_bash_cmd("pytest ...")) after making changes.
+- Do NOT modify existing tests or test data unless the issue explicitly requires it.
+- Prefer the smallest change that makes the tests pass and matches the issue description.
+- Keep your Thought concise (1–3 short sentences) and then call exactly ONE tool in each Action.
 
-- **You MUST use `replace_in_file()` to make actual code changes**
-- **You MUST verify changes exist before calling `finish()`**
-- **You MUST run tests before finishing to ensure your fix works**
-- **Text descriptions in `finish()` do NOT create patches - only file edits do**
-- **If `verify_changes()` shows no changes, you haven't fixed the issue**
-- **If tests fail, debug and fix before finishing**
-- **The system will REJECT finish() if no changes are detected - you cannot finish without making file edits**
+# Example pattern (do NOT hard-code these paths; they are just an example):
+
+Thought: I should find where MyClass is defined.
+Action: grep(pattern="MyClass", file_pattern="*.py")
+
+Thought: I found MyClass in src/foo.py. I will view the relevant lines.
+Action: show_file(file_path="src/foo.py")
+
+Thought: I see the bug in method do_thing at lines 40–55. I will edit those lines.
+Action: replace_in_file(
+    file_path="src/foo.py",
+    from_line=40,
+    to_line=55,
+    content=\"\"\"
+    def do_thing(x, y):
+        # new implementation here
+        ...
+    \"\"\"
+)
+
+Thought: Now I will run the failing test to confirm the fix.
+Action: run_test(test_path="tests/test_foo.py", verbose=True)
+
 """
 
         self.system_message_id = self.add_message("system", initial_system_content)
