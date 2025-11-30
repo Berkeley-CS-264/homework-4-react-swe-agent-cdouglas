@@ -52,20 +52,26 @@ class OpenAIModel(LLM):
         """
         try:
             # Use Responses API for GPT-5 models (does not support temperature)
+            # When previous_response_id is set, only send the last message since the API
+            # maintains conversation context. On first call, send all messages.
+            input_messages = messages if self.prev_response_id is None else messages[-1:]
+
             response = self.client.responses.create(
                 model=self.model_name,
-                input=messages,
+                input=input_messages,
                 previous_response_id=self.prev_response_id,
-                max_completion_tokens=4096,
+                max_output_tokens=4096,
             )
             
             # thread conversation
             self.prev_response_id = getattr(response, "id", None)
-            # Extract text from Responses API format
+            # Extract text from Responses API format using the same logic as mini-swe-agent
+            # Try output_text first (most common case)
             text = getattr(response, "output_text", None)
-            if not text:
-                # Fallback: extract from output structure if output_text is not available
-                # This handles the nested structure of Responses API output
+            if isinstance(text, str) and text:
+                pass  # Use output_text
+            else:
+                # Fallback: extract from output structure
                 try:
                     output_items = getattr(response, "output", [])
                     text_parts = []
@@ -73,20 +79,23 @@ class OpenAIModel(LLM):
                         if isinstance(item, dict):
                             content = item.get("content", [])
                         else:
+                            # Handle ResponseOutputMessage objects
                             content = getattr(item, "content", [])
 
                         for content_item in content:
                             if isinstance(content_item, dict):
                                 text_val = content_item.get("text")
+                            elif hasattr(content_item, "text"):
+                                text_val = content_item.text
                             else:
-                                text_val = getattr(content_item, "text", None)
+                                continue
 
                             if text_val:
                                 text_parts.append(text_val)
 
                     text = "\n\n".join(text_parts) if text_parts else ""
-                except (AttributeError, IndexError, TypeError):
-                    raise RuntimeError("Could not extract text from Responses API response")
+                except (AttributeError, IndexError, TypeError) as e:
+                    raise RuntimeError(f"Could not extract text from Responses API response: {e}")
 
             if not text:
                 raise RuntimeError("Empty response from OpenAI Responses API")

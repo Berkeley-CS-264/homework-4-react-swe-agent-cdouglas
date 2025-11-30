@@ -409,11 +409,11 @@ class TestOpenAIModel(unittest.TestCase):
             model=self.model_name,
             input=messages,
             previous_response_id=None,
-            max_completion_tokens=4096
+            max_output_tokens=4096
         )
 
     def test_api_call_with_previous_response_id(self):
-        """Test that API is called with previous_response_id on subsequent calls."""
+        """Test that API is called with previous_response_id on subsequent calls and only last message is sent."""
         # First call
         mock_response1 = Mock()
         mock_response1.id = "resp_123"
@@ -426,12 +426,29 @@ class TestOpenAIModel(unittest.TestCase):
 
         self.mock_client.responses.create.side_effect = [mock_response1, mock_response2]
 
-        messages = [{"role": "user", "content": "test"}]
-        self.llm.generate(messages)
-        self.llm.generate(messages)
+        # First call with full messages
+        messages1 = [
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": "first message"}
+        ]
+        self.llm.generate(messages1)
 
-        # Verify second call used previous_response_id
+        # Second call with full conversation (but only last message should be sent)
+        messages2 = [
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": "first message"},
+            {"role": "assistant", "content": "First"},
+            {"role": "user", "content": "second message"}
+        ]
+        self.llm.generate(messages2)
+
+        # Verify first call sent all messages
         calls = self.mock_client.responses.create.call_args_list
+        self.assertEqual(calls[0].kwargs["input"], messages1)
+        self.assertIsNone(calls[0].kwargs["previous_response_id"])
+
+        # Verify second call only sent last message and used previous_response_id
+        self.assertEqual(calls[1].kwargs["input"], [messages2[-1]])  # Only last message
         self.assertEqual(calls[1].kwargs["previous_response_id"], "resp_123")
 
     def test_stop_token_handling_with_whitespace(self):
