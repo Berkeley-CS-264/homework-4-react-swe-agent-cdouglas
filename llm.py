@@ -53,7 +53,7 @@ class OpenAIModel(LLM):
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                temperature=1,
+                temperature=0.3,
                 max_completion_tokens=4096,
             )
             

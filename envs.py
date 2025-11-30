@@ -177,6 +177,21 @@ class SWEEnvironment:
             if file_path.startswith('./'):
                 file_path = file_path[2:]
 
+            # Validate content doesn't contain function call markers
+            forbidden_markers = [
+                "----BEGIN_FUNCTION_CALL----",
+                "----END_FUNCTION_CALL----",
+                "----ARG----",
+                "----VALUE----"
+            ]
+            for marker in forbidden_markers:
+                if marker in content:
+                    raise ValueError(
+                        f"Content contains forbidden function call marker: {marker}. "
+                        f"File content must NOT include function call markers. "
+                        f"Only include the actual code/content you want to write to the file."
+                    )
+
             # Normalize and validate line numbers (make tolerant)
             try:
                 from_line = int(from_line)
@@ -334,13 +349,16 @@ except Exception as e:
         """
         try:
             flags = "-E" if case_sensitive else "-iE"  # -E for extended regex
-            cmd = f"grep -rn {flags} '{pattern}' --include='{file_pattern}' . 2>/dev/null || true"
+            cmd = f"grep -rn {flags} '{pattern}' --include='{file_pattern}' . 2>/dev/null | head -500 || true"
             output = self.env.execute(cmd)
 
             if isinstance(output, dict):
                 output = output.get("output", "") or output.get("stdout", "")
 
-            return output if output else "No matches found"
+            # Apply truncation for very long outputs
+            if output:
+                return self._normalize_output(output)
+            return "No matches found"
         except Exception as e:
             raise ValueError(f"Error searching for pattern: {str(e)}")
 

@@ -46,98 +46,35 @@ class ReactAgent:
 
         # Set up the initial structure of the history
         # Create required root nodes and a user node (task)
-        initial_system_content = """You are an autonomous software engineer working in a local checkout of a repository.
-Your task is to modify the code so that the issue below is resolved and all relevant tests pass.
+        initial_system_content = """You are an autonomous software engineer fixing bugs in a repository. Your goal: resolve the issue and make tests pass.
 
-# Environment & Constraints
-- You work in a local Python environment with the repo at the root directory.
-- You have NO internet access.
-- You may only interact with the repo using the tools listed below.
-- Do NOT modify existing tests or test data unless the issue explicitly requires it.
-- Prefer minimal, targeted changes over broad refactors.
-- Use get_repo_info() to learn the repository name and root directory.
+# Constraints
+- No internet access. Use only the tools provided.
+- Do NOT modify tests unless the issue explicitly requires it.
+- Make minimal, targeted changes. Prefer small fixes over refactors.
 
-# High-level workflow (follow this order)
-1. Carefully read the issue description in the user message.
-2. Use grep() and find_files() to locate relevant files, functions, and tests.
-3. Use show_file() and show_code_structure() to inspect small, relevant parts of the code.
-4. Identify an existing test (or small group of tests) that reproduces the bug and run it using run_test() or run_bash_cmd("pytest ...").
-5. When tests fail, call analyze_test_failure(test_output=...) on the pytest output to extract the key error type, message, and file/line location.
-6. Based on the failing test and code, write a short plan in your Thought:
-   - suspected root cause
-   - the specific file(s) and function(s) you will change
-   - which tests you will run after the change
-7. Apply a small, focused code change using replace_in_file(). Edit only the lines that are actually necessary.
-8. Re-run the same test(s) using run_test() or run_bash_cmd() to confirm the bug is fixed and no new failures appear.
-9. If tests still fail, inspect the test output, call analyze_test_failure() again if needed, refine your plan, and repeat steps 3–8.
-10. When you are confident the bug is fixed and tests pass, call finish() with a short explanation of:
-   - what you changed,
-   - why it fixes the issue,
-   - which tests you ran.
-
-# First step
-On your very first Action, you MUST:
-1. Call get_repo_info() to see the repo name and root directory.
-2. Then call either:
-   - find_test_file() to list likely test files, or
-   - grep() to search for a key symbol or phrase from the issue.
-Do NOT run broad commands like "pytest" or "ls -R" as your first action.
-
-# When choosing tests:
-- Prefer narrow tests over the whole suite:
-  - If you know the test file, use run_test(test_path="path/to/test_file.py").
-  - If you only know a keyword, use run_test(test_name="keyword") to run a subset with -k.
-- Avoid running the entire test suite repeatedly. Only do that near the end, if needed.
-- Make sure at least one failing test clearly matches the issue description (same feature, function, or error message).
-
-# When Stuck
-- Re-read the issue description carefully; you may have missed a key detail.
-- Use find_test_file() to locate likely relevant tests.
-- Re-read the relevant test file(s) with show_file() and understand exactly what is being asserted.
-- Use show_code_structure() to understand large or complex files before reading them in detail.
-- Use grep() to search for similar logic or patterns in other parts of the codebase.
-- Use analyze_test_failure() on pytest output to extract the key error and stack trace location.
-- Add temporary debug prints using replace_in_file() if needed to understand the control flow.
-- Consider edge cases: empty inputs, None values, type mismatches, boundary conditions, etc.
-- Remember that some fixes require changes in more than one place (e.g., both implementation and helper utilities).
-- If you significantly change a Python file, call check_syntax(file_path) on it before running tests.
+# Workflow
+1. First action: Call get_repo_info(), then find_test_file() or grep() to locate relevant code.
+2. Locate the bug: Use grep(), find_files(), show_file(), or show_code_structure() to find relevant files.
+3. Reproduce: Run a failing test with run_test() or run_bash_cmd("pytest ..."). Use analyze_test_failure() to understand errors.
+4. Fix: Use replace_in_file() to make targeted changes. NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, etc.) in file content.
+5. Verify: Re-run tests after EVERY edit. If tests fail, analyze and iterate.
+6. Finish: Call finish() only when tests pass and you've run tests since your last edit.
 
 # Critical Rules
-- Always make real code changes using replace_in_file(); your explanation in finish() does NOT modify files.
-- Do NOT modify files using run_bash_cmd(). Use replace_in_file() for all code changes so they are captured in the final patch.
-- Before your FIRST call to replace_in_file(), identify and run at least one failing test using run_test() or run_bash_cmd("pytest ...").
-- AFTER every successful call to replace_in_file(), run at least one test again.
-- Do NOT call finish() if:
-  - you have not clearly reproduced the bug with a failing test,
-  - the last tests you ran are still failing, or
-  - you have not run any tests since your last code change.
-- Do NOT modify existing tests or test data unless the issue explicitly requires it.
-- Prefer the smallest change that makes the tests pass and matches the issue description.
-- Keep your Thought concise (1–3 short sentences) and then call exactly ONE tool in each Action.
-- For large files, prefer show_file_snippet(path, start_line, end_line) to view just the relevant part, then use those line numbers with replace_in_file().
+- Use replace_in_file() for ALL code changes. Do NOT use run_bash_cmd() to edit files.
+- Run tests BEFORE your first edit and AFTER every edit.
+- For large files, use show_file_snippet(path, start_line, end_line) instead of show_file().
+- Keep Thoughts concise (1-3 sentences). Call exactly ONE tool per Action.
+- NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, ----ARG----, ----VALUE----) in replace_in_file() content.
+- Do NOT call finish() if tests are failing or you haven't run tests since your last edit.
 
-# Example pattern (do NOT hard-code these paths; they are just an example):
-
-Thought: I should find where MyClass is defined.
-Action: grep(pattern="MyClass", file_pattern="*.py")
-
-Thought: I found MyClass in src/foo.py. I will view the relevant lines.
-Action: show_file(file_path="src/foo.py")
-
-Thought: I see the bug in method do_thing at lines 40–55. I will edit those lines.
-Action: replace_in_file(
-    file_path="src/foo.py",
-    from_line=40,
-    to_line=55,
-    content=\"\"\"
-    def do_thing(x, y):
-        # new implementation here
-        ...
-    \"\"\"
-)
-
-Thought: Now I will run the failing test to confirm the fix.
-Action: run_test(test_path="tests/test_foo.py", verbose=True)
+# When Stuck
+- Re-read the issue description for missed details.
+- Use analyze_test_failure() to extract error types and locations.
+- Use show_code_structure() for large files before reading details.
+- Check edge cases: None values, empty inputs, type mismatches.
+- Call check_syntax() after significant Python file changes.
 
 """
 
@@ -212,7 +149,7 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
         # Organize tools by category
         tool_categories = {
             "Repository Information": ["get_repo_info"],
-            "File Operations": ["show_file", "replace_in_file", "grep", "find_files", "show_code_structure"],
+            "File Operations": ["show_file", "replace_in_file", "grep", "find_files", "show_code_structure", "show_file_snippet"],
             "Testing & Analysis": ["run_test", "analyze_test_failure", "find_test_file", "check_syntax"],
             "General": ["run_bash_cmd", "finish"],
         }
@@ -301,8 +238,20 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
             try:
                 function_call = self.parser.parse(response)
             except Exception as e:
-                # If parsing fails, add error as observation and continue
-                self.add_message("user", f"Error parsing function call: {str(e)}")
+                # If parsing fails, add error as observation with helpful context
+                error_msg = (
+                    f"Error parsing function call: {str(e)}\n"
+                    f"Make sure your response includes exactly one function call with the format:\n"
+                    f"{self.parser.BEGIN_CALL}\n"
+                    f"function_name\n"
+                    f"{self.parser.ARG_SEP}\n"
+                    f"arg_name\n"
+                    f"{self.parser.VALUE_SEP}\n"
+                    f"arg_value\n"
+                    f"{self.parser.END_CALL}\n"
+                    f"Your response should not include function call markers in file content."
+                )
+                self.add_message("user", error_msg)
                 continue
 
             # Check if finish was called
@@ -326,7 +275,11 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
             # Execute the tool
             try:
                 if function_call["name"] not in self.function_map:
-                    raise ValueError(f"Unknown function: {function_call['name']}")
+                    available_tools = ", ".join(sorted(self.function_map.keys()))
+                    raise ValueError(
+                        f"Unknown function: {function_call['name']}. "
+                        f"Available functions: {available_tools}"
+                    )
                 
                 result = self.function_map[function_call["name"]](**function_call["arguments"])
 
@@ -334,18 +287,40 @@ Action: run_test(test_path="tests/test_foo.py", verbose=True)
                 if function_call["name"] == "replace_in_file":
                     self.made_edit = True
                     self.ran_tests_after_edit = False
-                elif function_call["name"] in ("run_test",) or (
-                    function_call["name"] == "run_bash_cmd"
-                    and "pytest" in function_call["arguments"].get("command", "")
-                ):
+                elif function_call["name"] == "run_test":
                     if self.made_edit:
+                        self.ran_tests_after_edit = True
+                elif function_call["name"] == "run_bash_cmd":
+                    command = function_call["arguments"].get("command", "").lower()
+                    # Detect various test execution patterns
+                    is_test_command = (
+                        "pytest" in command or
+                        "python -m pytest" in command or
+                        "python -m unittest" in command or
+                        "make test" in command or
+                        ("test" in command and any(keyword in command for keyword in ["test_", "tests/", "/test"]))
+                    )
+                    if is_test_command and self.made_edit:
                         self.ran_tests_after_edit = True
 
                 # Add tool result as observation (user message)
                 self.add_message("user", f"Observation: {result}")
+            except ValueError as e:
+                # ValueError usually indicates a user error (bad arguments, validation failure)
+                # Provide helpful context and suggestions
+                error_msg = f"Error executing {function_call['name']}: {str(e)}"
+                if "function call marker" in str(e).lower():
+                    error_msg += "\nTip: When using replace_in_file(), only include the actual code content. Do not include function call markers (----BEGIN_FUNCTION_CALL----, etc.) in the content parameter."
+                elif "not found" in str(e).lower() or "does not exist" in str(e).lower():
+                    error_msg += "\nTip: Use find_files() or grep() to locate the correct file path."
+                self.add_message("user", error_msg)
             except Exception as e:
-                # Add error as observation
-                self.add_message("user", f"Error executing {function_call['name']}: {str(e)}")
+                # Other exceptions (system errors, etc.)
+                error_msg = (
+                    f"Error executing {function_call['name']}: {type(e).__name__}: {str(e)}\n"
+                    f"Arguments used: {function_call.get('arguments', {})}"
+                )
+                self.add_message("user", error_msg)
         
         # Max steps reached
         return self.finish("Max steps reached")

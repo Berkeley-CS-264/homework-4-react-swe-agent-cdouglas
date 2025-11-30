@@ -84,7 +84,14 @@ DO NOT CHANGE ANY TEST! AS THEY WILL BE USED FOR EVALUATION.
                             break
                         value_lines.append(lines[i])
                         i += 1
-                    arguments[arg_name] = '\n'.join(value_lines).strip()
+                    parsed_value = '\n'.join(value_lines).strip()
+                    # Validate that parsed value doesn't contain function call markers (except as part of the parsing structure)
+                    # This helps catch cases where the LLM accidentally includes markers in content
+                    if self.BEGIN_CALL in parsed_value or self.END_CALL in parsed_value:
+                        # These markers should only appear in the outer structure, not in argument values
+                        # If they appear in values, it's likely a parsing error or LLM mistake
+                        pass  # We'll let it through but the validation in replace_in_file will catch it
+                    arguments[arg_name] = parsed_value
                 else:
                     # No value provided, set to empty string
                     arguments[arg_name] = ""
