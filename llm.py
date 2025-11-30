@@ -20,11 +20,11 @@ class LLM(ABC):
 
 class OpenAIModel(LLM):
     """
-    Example LLM implementation using OpenAI's Responses API.
+    LLM implementation using OpenAI's Responses API.
 
-    TODO(student): Implement this class to call your chosen backend (e.g., OpenAI GPT-5 mini)
-    and return the model's text output. You should ensure the model produces the response
-    format required by ResponseParser and include the stop token in the output string.
+    This implementation uses the Responses API which is designed for GPT-5 models
+    and supports extended reasoning capabilities. The Responses API does not support
+    temperature parameters.
     """
 
     def __init__(self, stop_token: str, model_name: str = "gpt-5-mini", log_dir: Path = None):
@@ -38,10 +38,11 @@ class OpenAIModel(LLM):
         self.model_name = model_name
         self.log_dir = log_dir
         self.call_count = 0
+        self.prev_response_id = None
 
     def generate(self, messages: list) -> str:
         """
-        Call the OpenAI API with the given messages and return the response text.
+        Call the OpenAI Responses API with the given messages and return the response text.
         
         Args:
             messages: List of message dictionaries with "role" and "content" keys
@@ -50,14 +51,45 @@ class OpenAIModel(LLM):
             The text response from the model including the stop token
         """
         try:
-            response = self.client.chat.completions.create(
+            # Use Responses API for GPT-5 models (does not support temperature)
+            response = self.client.responses.create(
                 model=self.model_name,
-                messages=messages,
-                temperature=1,
+                input=messages,
+                previous_response_id=self.prev_response_id,
                 max_completion_tokens=4096,
             )
             
-            text = response.choices[0].message.content
+            # thread conversation
+            self.prev_response_id = getattr(response, "id", None)
+            # Extract text from Responses API format
+            text = getattr(response, "output_text", None)
+            if not text:
+                # Fallback: extract from output structure if output_text is not available
+                # This handles the nested structure of Responses API output
+                try:
+                    output_items = getattr(response, "output", [])
+                    text_parts = []
+                    for item in output_items:
+                        if isinstance(item, dict):
+                            content = item.get("content", [])
+                        else:
+                            content = getattr(item, "content", [])
+
+                        for content_item in content:
+                            if isinstance(content_item, dict):
+                                text_val = content_item.get("text")
+                            else:
+                                text_val = getattr(content_item, "text", None)
+
+                            if text_val:
+                                text_parts.append(text_val)
+
+                    text = "\n\n".join(text_parts) if text_parts else ""
+                except (AttributeError, IndexError, TypeError):
+                    raise RuntimeError("Could not extract text from Responses API response")
+
+            if not text:
+                raise RuntimeError("Empty response from OpenAI Responses API")
 
             # split from the first stop token (including the stop token)
             text = text.split(self.stop_token)[0].strip() + "\n" + self.stop_token

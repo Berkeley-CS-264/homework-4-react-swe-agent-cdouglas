@@ -35,7 +35,7 @@ def process_instance(
     (instance_dir / f"{instance_id}.traj.json").unlink(missing_ok=True)
     
     # Initialize the model and parser
-    llm = OpenAIModel(ResponseParser.END_CALL, model_name)
+    llm = OpenAIModel(ResponseParser.END_CALL, model_name, log_dir=output_dir / "llm_logs")
     parser = ResponseParser()
     task = instance["problem_statement"]
     
