@@ -35,7 +35,8 @@ def process_instance(
     (instance_dir / f"{instance_id}.traj.json").unlink(missing_ok=True)
     
     # Initialize the model and parser
-    llm = OpenAIModel(ResponseParser.END_CALL, model_name, log_dir=output_dir / "llm_logs")
+    log_dir = output_dir / "llm_logs"
+    llm = OpenAIModel(ResponseParser.END_CALL, model_name, log_dir=log_dir)
     parser = ResponseParser()
     task = instance["problem_statement"]
     
@@ -128,6 +129,13 @@ def main(
     output_path = Path(output)
     output_path.mkdir(parents=True, exist_ok=True)
     print(f"Results will be saved to {output_path}")
+
+    # Delete existing log file at the start of the run to avoid accumulation
+    log_dir = output_path / "llm_logs"
+    log_file = log_dir / "llm_calls.jsonl"
+    if log_file.exists():
+        log_file.unlink()
+        print(f"Deleted existing log file: {log_file}")
 
     dataset_path = DATASET_MAPPING.get(subset, subset)
     print(f"Loading dataset {dataset_path}, split {split}...")

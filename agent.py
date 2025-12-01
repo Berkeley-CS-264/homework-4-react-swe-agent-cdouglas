@@ -228,8 +228,19 @@ class ReactAgent:
             # Build messages for LLM (must be list of dicts, not string)
             messages = self.get_messages_for_llm()
             
-            # Query LLM
-            response = self.llm.generate(messages)
+            # Query LLM with exception handling
+            try:
+                response = self.llm.generate(messages)
+            except Exception as e:
+                # If LLM call fails, add error message and allow agent to continue
+                # This prevents the entire agent from crashing on API failures
+                error_msg = (
+                    f"Error calling LLM: {type(e).__name__}: {str(e)}\n"
+                    f"The API call failed. Please try again with your next action."
+                )
+                self.add_message("user", error_msg)
+                # Continue to next iteration - agent can try again
+                continue
             
             # Add LLM response as assistant message
             self.add_message("assistant", response)
