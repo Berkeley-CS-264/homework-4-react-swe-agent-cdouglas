@@ -222,7 +222,7 @@ class TestOpenAIModel(unittest.TestCase):
                 {
                     "role": "user",
                     "content": [
-                        {"type": "output_text", "text": "test"}
+                        {"type": "input_text", "text": "test"}
                     ],
                 }
             ]
@@ -260,7 +260,7 @@ class TestOpenAIModel(unittest.TestCase):
                 {
                     "role": "user",
                     "content": [
-                        {"type": "output_text", "text": "test"}
+                        {"type": "input_text", "text": "test"}
                     ],
                 }
             ]
@@ -302,7 +302,7 @@ class TestOpenAIModel(unittest.TestCase):
                 {
                     "role": "user",
                     "content": [
-                        {"type": "output_text", "text": "test"}
+                        {"type": "input_text", "text": "test"}
                     ],
                 }
             ]
@@ -356,7 +356,7 @@ class TestOpenAIModel(unittest.TestCase):
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "test message"}
+                    {"type": "input_text", "text": "test message"}
                 ],
             }
         ]
@@ -388,13 +388,13 @@ class TestOpenAIModel(unittest.TestCase):
             {
                 "role": "system",
                 "content": [
-                    {"type": "output_text", "text": "You are a helpful assistant"}
+                    {"type": "input_text", "text": "You are a helpful assistant"}
                 ],
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "first message"}
+                    {"type": "input_text", "text": "first message"}
                 ],
             },
         ]
@@ -410,25 +410,25 @@ class TestOpenAIModel(unittest.TestCase):
             {
                 "role": "system",
                 "content": [
-                    {"type": "output_text", "text": "You are a helpful assistant"}
+                    {"type": "input_text", "text": "You are a helpful assistant"}
                 ],
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "first message"}
+                    {"type": "input_text", "text": "first message"}
                 ],
             },
             {
                 "role": "assistant",
                 "content": [
-                    {"type": "output_text", "text": "First"}
+                    {"type": "input_text", "text": "First"}
                 ],
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "second message"}
+                    {"type": "input_text", "text": "second message"}
                 ],
             },
         ]

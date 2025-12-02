@@ -53,7 +53,7 @@ class OpenAIModel(LLM):
             {
                 "role": m["role"],
                 "content": [
-                    {"type": "output_text", "text": m["content"]}
+                    {"type": "input_text", "text": m["content"]}
                 ],
             }
             for m in messages

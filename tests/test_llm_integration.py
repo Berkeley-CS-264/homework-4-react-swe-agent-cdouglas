@@ -88,13 +88,13 @@ class TestLLMLoggingIntegration(unittest.TestCase):
             {
                 "role": "system",
                 "content": [
-                    {"type": "output_text", "text": "You are a helpful assistant"}
+                    {"type": "input_text", "text": "You are a helpful assistant"}
                 ],
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "first message"}
+                    {"type": "input_text", "text": "first message"}
                 ],
             },
         ]
@@ -110,25 +110,25 @@ class TestLLMLoggingIntegration(unittest.TestCase):
             {
                 "role": "system",
                 "content": [
-                    {"type": "output_text", "text": "You are a helpful assistant"}
+                    {"type": "input_text", "text": "You are a helpful assistant"}
                 ],
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "first message"}
+                    {"type": "input_text", "text": "first message"}
                 ],
             },
             {
                 "role": "assistant",
                 "content": [
-                    {"type": "output_text", "text": "First response"}
+                    {"type": "input_text", "text": "First response"}
                 ],
             },
             {
                 "role": "user",
                 "content": [
-                    {"type": "output_text", "text": "second message"}
+                    {"type": "input_text", "text": "second message"}
                 ],
             },
         ]
