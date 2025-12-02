@@ -49,15 +49,23 @@ class OpenAIModel(LLM):
         Returns:
             The text response from the model including the stop token
         """
-        formatted_messages = [
-            {
-                "role": m["role"],
-                "content": [
-                    {"type": "input_text", "text": m["content"]}
-                ],
-            }
-            for m in messages
-        ]
+        formatted_messages = []
+        for m in messages:
+            role = m.get("role")
+            content_text = m.get("content", "")
+
+            # The Responses API expects assistant turn content to use "output_text",
+            # while system/user/developer/tool inputs should use "input_text".
+            content_type = "output_text" if role == "assistant" else "input_text"
+
+            formatted_messages.append(
+                {
+                    "role": role,
+                    "content": [
+                        {"type": content_type, "text": content_text}
+                    ],
+                }
+            )
 
         try:
             # Use Responses API for GPT-5 models (does not support temperature)

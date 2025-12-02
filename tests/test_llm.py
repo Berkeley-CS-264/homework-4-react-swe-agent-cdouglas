@@ -368,6 +368,55 @@ class TestOpenAIModel(unittest.TestCase):
             max_output_tokens=4096
         )
 
+    def test_api_call_uses_output_text_for_assistant_turns(self):
+        """Assistant role content should be sent as output_text for Responses API."""
+        mock_response = Mock()
+        mock_response.id = "resp_123"
+        mock_response.output_text = "Follow up"
+        self.mock_client.responses.create.return_value = mock_response
+
+        messages = [
+            {"role": "system", "content": "system prompt"},
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"},
+            {"role": "user", "content": "next"},
+        ]
+
+        self.llm.generate(messages)
+
+        expected_input = [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "input_text", "text": "system prompt"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "hi"}
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "output_text", "text": "hello"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "next"}
+                ],
+            },
+        ]
+
+        self.mock_client.responses.create.assert_called_once_with(
+            model=self.model_name,
+            input=expected_input,
+            max_output_tokens=4096,
+        )
+
     def test_api_call_sends_full_messages_each_time(self):
         """Test that each API call sends the full formatted message list without threading."""
         mock_response1 = Mock()
@@ -422,7 +471,7 @@ class TestOpenAIModel(unittest.TestCase):
             {
                 "role": "assistant",
                 "content": [
-                    {"type": "input_text", "text": "First"}
+                    {"type": "output_text", "text": "First"}
                 ],
             },
             {

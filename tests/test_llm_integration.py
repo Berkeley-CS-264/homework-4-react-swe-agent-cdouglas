@@ -122,7 +122,7 @@ class TestLLMLoggingIntegration(unittest.TestCase):
             {
                 "role": "assistant",
                 "content": [
-                    {"type": "input_text", "text": "First response"}
+                    {"type": "output_text", "text": "First response"}
                 ],
             },
             {
