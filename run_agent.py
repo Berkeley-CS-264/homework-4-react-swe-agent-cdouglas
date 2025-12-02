@@ -39,6 +39,16 @@ def process_instance(
     llm = OpenAIModel(ResponseParser.END_CALL, model_name, log_dir=log_dir)
     parser = ResponseParser()
     task = instance["problem_statement"]
+    # Append canonical test metadata so the agent can reproduce failures quickly
+    metadata_sections = []
+    if instance.get("test_path"):
+        metadata_sections.append(f"Recommended failing test file(s):\n{instance['test_path']}")
+    if instance.get("test_cmd"):
+        metadata_sections.append(f"Recommended test command:\n{instance['test_cmd']}")
+    if instance.get("test_command") and instance.get("test_command") != instance.get("test_cmd"):
+        metadata_sections.append(f"Alternative test command:\n{instance['test_command']}")
+    if metadata_sections:
+        task = task + "\n\n" + "\n\n".join(metadata_sections)
     
     print(f"Processing instance {instance_id}")
     agent = None    
@@ -74,11 +84,13 @@ def process_instance(
         # Add environment functions to the agent
         agent.add_functions([
             env.get_repo_info,
+            env.git_status,
             env.run_bash_cmd,
             env.show_file,
             env.replace_in_file,
             env.grep,
             env.find_files,
+            env.run_relevant_tests,
             env.run_test,
             env.analyze_test_failure,
             env.find_test_file,

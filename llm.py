@@ -38,7 +38,6 @@ class OpenAIModel(LLM):
         self.model_name = model_name
         self.log_dir = log_dir
         self.call_count = 0
-        self.prev_response_id = None
 
     def generate(self, messages: list) -> str:
         """
@@ -46,32 +45,28 @@ class OpenAIModel(LLM):
         
         Args:
             messages: List of message dictionaries with "role" and "content" keys
-            
+
         Returns:
             The text response from the model including the stop token
-
-        Note:
-            Each instance creates a new OpenAIModel instance, so prev_response_id starts as None
-            for each instance. This ensures conversation threading is isolated per instance.
         """
-        # When previous_response_id is set, only send the last message since the API
-        # maintains conversation context. On first call, send all messages.
-        input_messages = messages if self.prev_response_id is None else messages[-1:]
-        # Store the previous_response_id that will be used for this call (before it gets updated)
-        previous_response_id_for_call = self.prev_response_id
+        formatted_messages = [
+            {
+                "role": m["role"],
+                "content": [
+                    {"type": "output_text", "text": m["content"]}
+                ],
+            }
+            for m in messages
+        ]
 
         try:
             # Use Responses API for GPT-5 models (does not support temperature)
             response = self.client.responses.create(
                 model=self.model_name,
-                input=input_messages,
-                previous_response_id=self.prev_response_id,
+                input=formatted_messages,
                 max_output_tokens=4096,
             )
-            
-            # thread conversation
-            response_id = getattr(response, "id", None)
-            self.prev_response_id = response_id
+
             # Extract text from Responses API format using the same logic as mini-swe-agent
             # Try output_text first (most common case)
             text = getattr(response, "output_text", None)
@@ -111,24 +106,24 @@ class OpenAIModel(LLM):
             text = text.split(self.stop_token)[0].strip() + "\n" + self.stop_token
             
             # Log the LLM call if log_dir is set
-            # Log input_messages (what was actually sent) not messages (what agent passed in)
-            # Include response_id so it can be correlated with its successor's previous_response_id
+            # Log formatted_messages (what was actually sent) not messages (what agent passed in)
             if self.log_dir:
-                self._log_call(input_messages, text, success=True, previous_response_id=previous_response_id_for_call, response_id=response_id)
+                response_id = getattr(response, "id", None)
+                self._log_call(formatted_messages, text, success=True, response_id=response_id)
             
             return text
             
         except Exception as e:
             # Log the failed call if log_dir is set
-            # Log input_messages (what was actually sent) not messages (what agent passed in)
+            # Log formatted_messages (what was actually sent) not messages (what agent passed in)
             # No response_id available on failure
             if self.log_dir:
-                self._log_call(input_messages, None, success=False, error=str(e), previous_response_id=previous_response_id_for_call, response_id=None)
+                self._log_call(formatted_messages, None, success=False, error=str(e), response_id=None)
             
             # Re-raise the exception with more context
             raise RuntimeError(f"OpenAI API call failed: {type(e).__name__}: {str(e)}") from e
     
-    def _log_call(self, messages: list, response: str = None, success: bool = True, error: str = None, previous_response_id: str = None, response_id: str = None) -> None:
+    def _log_call(self, messages: list, response: str = None, success: bool = True, error: str = None, response_id: str = None) -> None:
         """
         Log an LLM generation call to a file in the log directory.
         
@@ -137,8 +132,7 @@ class OpenAIModel(LLM):
             response: The generated response (None if call failed)
             success: Whether the API call was successful
             error: Error message if the call failed
-            previous_response_id: The previous_response_id that was used for this call
-            response_id: The response ID returned by the API (for correlating with successor's previous_response_id)
+            response_id: The response ID returned by the API
         """
         if not self.log_dir:
             return
@@ -157,7 +151,6 @@ class OpenAIModel(LLM):
             "success": success,
             "messages": messages,
             "response": response,
-            "previous_response_id": previous_response_id,
             "response_id": response_id
         }
         

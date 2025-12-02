@@ -12,24 +12,23 @@ class ResponseParser:
     VALUE_SEP = "----VALUE----"
 
     # Students should include this exact template in the system prompt so the LLM follows it.
-    response_format = f"""
-your_thoughts_here
-...
-{BEGIN_CALL}
-function_name
-{ARG_SEP}
-arg1_name
-{VALUE_SEP}
-arg1_value (can be multiline)
-{ARG_SEP}
-arg2_name
-{VALUE_SEP}
-arg2_value (can be multiline)
-...
-{END_CALL}
-
-DO NOT CHANGE ANY TEST! AS THEY WILL BE USED FOR EVALUATION.
-"""
+    response_format = (
+        "your_thoughts_here\n"  # concise plan (1-3 sentences)
+        "...\n"
+        f"{BEGIN_CALL}\n"
+        "function_name\n"
+        f"{ARG_SEP}\n"
+        "arg1_name\n"
+        f"{VALUE_SEP}\n"
+        "arg1_value (can be multiline)\n"
+        f"{ARG_SEP}\n"
+        "arg2_name\n"
+        f"{VALUE_SEP}\n"
+        "arg2_value (can be multiline)\n"
+        "...\n"
+        f"{END_CALL}\n\n"
+        "DO NOT CHANGE ANY TEST! AS THEY WILL BE USED FOR EVALUATION."
+    )
 
     def parse(self, text: str) -> dict:
         """

@@ -171,63 +171,75 @@ class TestAgentFinishValidation(unittest.TestCase):
         def mock_replace_in_file(file_path, from_line, to_line, content):
             return f"Successfully replaced lines {from_line} to {to_line} in {file_path}"
 
+        test_outputs = ["FAILED", "PASSED"]
+
         def mock_run_test(test_path=None, test_name=None, verbose=False):
-            return "PASSED"
+            return test_outputs.pop(0) if test_outputs else "PASSED"
 
         agent2.add_functions([mock_replace_in_file, mock_run_test])
 
-        # Set up LLM to: make edit, run test, then finish
+        # Set up LLM to: reproduce failure, make edit, rerun tests, then finish
+        reproduce_call = (
+            "I'll reproduce the failure first.\n",
+            "----BEGIN_FUNCTION_CALL----\n",
+            "run_test\n",
+            "----ARG----\n",
+            "test_path\n",
+            "----VALUE----\n",
+            "test.py\n",
+            "----END_FUNCTION_CALL----",
+        )
         edit_call = (
-            "I'll make a change.\n"
-            "----BEGIN_FUNCTION_CALL----\n"
-            "replace_in_file\n"
-            "----ARG----\n"
-            "file_path\n"
-            "----VALUE----\n"
-            "test.py\n"
-            "----ARG----\n"
-            "from_line\n"
-            "----VALUE----\n"
-            "1\n"
-            "----ARG----\n"
-            "to_line\n"
-            "----VALUE----\n"
-            "1\n"
-            "----ARG----\n"
-            "content\n"
-            "----VALUE----\n"
-            "new code\n"
-            "----END_FUNCTION_CALL----"
+            "I'll make a change.\n",
+            "----BEGIN_FUNCTION_CALL----\n",
+            "replace_in_file\n",
+            "----ARG----\n",
+            "file_path\n",
+            "----VALUE----\n",
+            "test.py\n",
+            "----ARG----\n",
+            "from_line\n",
+            "----VALUE----\n",
+            "1\n",
+            "----ARG----\n",
+            "to_line\n",
+            "----VALUE----\n",
+            "1\n",
+            "----ARG----\n",
+            "content\n",
+            "----VALUE----\n",
+            "new code\n",
+            "----END_FUNCTION_CALL----",
         )
         test_call = (
-            "Now I'll run tests.\n"
-            "----BEGIN_FUNCTION_CALL----\n"
-            "run_test\n"
-            "----ARG----\n"
-            "test_path\n"
-            "----VALUE----\n"
-            "test.py\n"
-            "----END_FUNCTION_CALL----"
+            "Now I'll rerun tests.\n",
+            "----BEGIN_FUNCTION_CALL----\n",
+            "run_test\n",
+            "----ARG----\n",
+            "test_path\n",
+            "----VALUE----\n",
+            "test.py\n",
+            "----END_FUNCTION_CALL----",
         )
 
         finish_call = (
-            "Tests passed, I'll finish.\n"
-            "----BEGIN_FUNCTION_CALL----\n"
-            "finish\n"
-            "----ARG----\n"
-            "result\n"
-            "----VALUE----\n"
-            "Fixed the issue\n"
-            "----END_FUNCTION_CALL----"
+            "Tests passed, I'll finish.\n",
+            "----BEGIN_FUNCTION_CALL----\n",
+            "finish\n",
+            "----ARG----\n",
+            "result\n",
+            "----VALUE----\n",
+            "Fixed the issue\n",
+            "----END_FUNCTION_CALL----",
         )
         # Set LLM responses for this test
-        llm2.responses = [edit_call, test_call, finish_call]
+        llm2.responses = [reproduce_call, edit_call, test_call, finish_call]
         llm2.call_count = 0
 
-        # Run agent (need enough steps for edit, test, and finish)
-        result = agent2.run("Test task", max_steps=5)
+        # Run agent (need enough steps for failure reproduction, edit, retest, and finish)
+        result = agent2.run("Test task", max_steps=6)
 
-        # Should finish successfully
+        # Should finish successfully after passing test
         self.assertEqual(result, "Fixed the issue")
 
     def test_max_steps_reached_without_changes(self):

@@ -97,84 +97,6 @@ class TestOpenAIModel(unittest.TestCase):
         # Should have the text before the stop token
         self.assertIn("Response text", result)
 
-    def test_previous_response_id_initial_call(self):
-        """Test that previous_response_id is None on first call."""
-        mock_response = Mock()
-        mock_response.id = "resp_123"
-        mock_response.output_text = "First response"
-        self.mock_client.responses.create.return_value = mock_response
-
-        messages = [{"role": "user", "content": "first"}]
-        self.llm.generate(messages)
-
-        # Verify previous_response_id was None on first call
-        call_args = self.mock_client.responses.create.call_args
-        self.assertIsNone(call_args.kwargs.get("previous_response_id"))
-
-        # Verify it was set after the call
-        self.assertEqual(self.llm.prev_response_id, "resp_123")
-
-    def test_previous_response_id_chaining(self):
-        """Test that previous_response_id is correctly chained across multiple calls."""
-        # First call
-        mock_response1 = Mock()
-        mock_response1.id = "resp_123"
-        mock_response1.output_text = "First response"
-
-        # Second call
-        mock_response2 = Mock()
-        mock_response2.id = "resp_456"
-        mock_response2.output_text = "Second response"
-
-        # Set up side effect to return different responses
-        self.mock_client.responses.create.side_effect = [mock_response1, mock_response2]
-
-        messages1 = [{"role": "user", "content": "first"}]
-        result1 = self.llm.generate(messages1)
-
-        # Verify first call had None as previous_response_id
-        first_call = self.mock_client.responses.create.call_args_list[0]
-        self.assertIsNone(first_call.kwargs.get("previous_response_id"))
-        self.assertEqual(self.llm.prev_response_id, "resp_123")
-
-        # Second call
-        messages2 = [{"role": "user", "content": "second"}]
-        result2 = self.llm.generate(messages2)
-
-        # Verify second call used the first response's ID
-        second_call = self.mock_client.responses.create.call_args_list[1]
-        self.assertEqual(second_call.kwargs.get("previous_response_id"), "resp_123")
-        self.assertEqual(self.llm.prev_response_id, "resp_456")
-
-        # Verify both responses have stop tokens
-        self.assertIn(self.stop_token, result1)
-        self.assertIn(self.stop_token, result2)
-
-    def test_previous_response_id_multiple_calls(self):
-        """Test previous_response_id chaining across three or more calls."""
-        responses = []
-        for i in range(3):
-            mock_response = Mock()
-            mock_response.id = f"resp_{i+1}"
-            mock_response.output_text = f"Response {i+1}"
-            responses.append(mock_response)
-
-        self.mock_client.responses.create.side_effect = responses
-
-        # Make three calls
-        for i in range(3):
-            messages = [{"role": "user", "content": f"message {i+1}"}]
-            self.llm.generate(messages)
-
-        # Verify chaining
-        calls = self.mock_client.responses.create.call_args_list
-        self.assertIsNone(calls[0].kwargs.get("previous_response_id"))
-        self.assertEqual(calls[1].kwargs.get("previous_response_id"), "resp_1")
-        self.assertEqual(calls[2].kwargs.get("previous_response_id"), "resp_2")
-
-        # Verify final previous_response_id
-        self.assertEqual(self.llm.prev_response_id, "resp_3")
-
     def test_text_extraction_from_output_text(self):
         """Test text extraction when output_text is available."""
         mock_response = Mock()
@@ -296,6 +218,14 @@ class TestOpenAIModel(unittest.TestCase):
             self.mock_client.responses.create.return_value = mock_response
 
             messages = [{"role": "user", "content": "test"}]
+            formatted_messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "output_text", "text": "test"}
+                    ],
+                }
+            ]
             llm.generate(messages)
 
             # Check log file was created
@@ -309,7 +239,7 @@ class TestOpenAIModel(unittest.TestCase):
             self.assertEqual(log_entry["call_number"], 1)
             self.assertEqual(log_entry["model"], self.model_name)
             self.assertTrue(log_entry["success"])
-            self.assertEqual(log_entry["messages"], messages)
+            self.assertEqual(log_entry["messages"], formatted_messages)
             self.assertIn(self.stop_token, log_entry["response"])
 
     def test_logging_on_failure(self):
@@ -326,6 +256,14 @@ class TestOpenAIModel(unittest.TestCase):
             self.mock_client.responses.create.side_effect = Exception("API Error")
 
             messages = [{"role": "user", "content": "test"}]
+            formatted_messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "output_text", "text": "test"}
+                    ],
+                }
+            ]
 
             with self.assertRaises(RuntimeError):
                 llm.generate(messages)
@@ -341,6 +279,7 @@ class TestOpenAIModel(unittest.TestCase):
             self.assertFalse(log_entry["success"])
             self.assertIn("error", log_entry)
             self.assertEqual(log_entry["error"], "API Error")
+            self.assertEqual(log_entry["messages"], formatted_messages)
 
     def test_logging_multiple_calls(self):
         """Test that multiple calls are logged with correct call numbers."""
@@ -359,6 +298,14 @@ class TestOpenAIModel(unittest.TestCase):
             self.mock_client.responses.create.return_value = mock_response
 
             messages = [{"role": "user", "content": "test"}]
+            formatted_messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "output_text", "text": "test"}
+                    ],
+                }
+            ]
 
             # Make three calls
             for _ in range(3):
@@ -376,6 +323,7 @@ class TestOpenAIModel(unittest.TestCase):
             for i, line in enumerate(lines, 1):
                 log_entry = json.loads(line)
                 self.assertEqual(log_entry["call_number"], i)
+                self.assertEqual(log_entry["messages"], formatted_messages)
 
     def test_no_logging_when_log_dir_not_set(self):
         """Test that no logging occurs when log_dir is None."""
@@ -404,52 +352,93 @@ class TestOpenAIModel(unittest.TestCase):
         messages = [{"role": "user", "content": "test message"}]
         self.llm.generate(messages)
 
+        formatted_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "test message"}
+                ],
+            }
+        ]
+
         # Verify API was called with correct parameters
         self.mock_client.responses.create.assert_called_once_with(
             model=self.model_name,
-            input=messages,
-            previous_response_id=None,
+            input=formatted_messages,
             max_output_tokens=4096
         )
 
-    def test_api_call_with_previous_response_id(self):
-        """Test that API is called with previous_response_id on subsequent calls and only last message is sent."""
-        # First call
+    def test_api_call_sends_full_messages_each_time(self):
+        """Test that each API call sends the full formatted message list without threading."""
         mock_response1 = Mock()
         mock_response1.id = "resp_123"
         mock_response1.output_text = "First"
 
-        # Second call
         mock_response2 = Mock()
         mock_response2.id = "resp_456"
         mock_response2.output_text = "Second"
 
         self.mock_client.responses.create.side_effect = [mock_response1, mock_response2]
 
-        # First call with full messages
         messages1 = [
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "first message"}
         ]
+        formatted1 = [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "output_text", "text": "You are a helpful assistant"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "first message"}
+                ],
+            },
+        ]
         self.llm.generate(messages1)
 
-        # Second call with full conversation (but only last message should be sent)
         messages2 = [
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "first message"},
             {"role": "assistant", "content": "First"},
             {"role": "user", "content": "second message"}
         ]
+        formatted2 = [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "output_text", "text": "You are a helpful assistant"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "first message"}
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "output_text", "text": "First"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "second message"}
+                ],
+            },
+        ]
         self.llm.generate(messages2)
 
-        # Verify first call sent all messages
         calls = self.mock_client.responses.create.call_args_list
-        self.assertEqual(calls[0].kwargs["input"], messages1)
-        self.assertIsNone(calls[0].kwargs["previous_response_id"])
-
-        # Verify second call only sent last message and used previous_response_id
-        self.assertEqual(calls[1].kwargs["input"], [messages2[-1]])  # Only last message
-        self.assertEqual(calls[1].kwargs["previous_response_id"], "resp_123")
+        self.assertEqual(calls[0].kwargs["input"], formatted1)
+        self.assertNotIn("previous_response_id", calls[0].kwargs)
+        self.assertEqual(calls[1].kwargs["input"], formatted2)
+        self.assertNotIn("previous_response_id", calls[1].kwargs)
 
     def test_stop_token_handling_with_whitespace(self):
         """Test stop token handling with various whitespace scenarios."""
@@ -479,19 +468,15 @@ class TestOpenAIModel(unittest.TestCase):
         # Should still work
         self.assertIn("Response without ID", result)
         self.assertIn(self.stop_token, result)
-        # previous_response_id should be None
-        self.assertIsNone(self.llm.prev_response_id)
 
-        # Next call should still work with None
+        # Next call should still work even when ID was None
         mock_response2 = Mock()
         mock_response2.id = "resp_456"
         mock_response2.output_text = "Second response"
         self.mock_client.responses.create.return_value = mock_response2
 
         result2 = self.llm.generate(messages)
-        # Should have called with None as previous_response_id
-        calls = self.mock_client.responses.create.call_args_list
-        self.assertIsNone(calls[-1].kwargs.get("previous_response_id"))
+        self.assertIn("Second response", result2)
 
 
 if __name__ == '__main__':

@@ -330,9 +330,8 @@ except Exception as e:
             if "No such file" in error_msg and ("/tmp/" in error_msg or "can't open file" in error_msg):
                 return (f"Error: Temporary script file not found in container. "
                        f"This indicates a system error with file operations. "
-                       f"Please try the replace_in_file() call again. "
-                       f"If the problem persists, you may need to use run_bash_cmd() "
-                       f"to manually edit the file. Original error: {error_msg}")
+                       f"Please retry the replace_in_file() call with corrected paths/line numbers. "
+                       f"Original error: {error_msg}")
             raise ValueError(f"Error replacing lines in {file_path}: {error_msg}")
 
     def grep(self, pattern: str, file_pattern: str = "*", case_sensitive: bool = True) -> str:
@@ -442,6 +441,50 @@ except Exception as e:
             if "not found" in error_msg.lower() or "no such file" in error_msg.lower():
                 return f"Error: Test path not found. Use find_test_file() to locate test files.\nOriginal error: {error_msg}"
             raise ValueError(f"Error running tests: {error_msg}")
+
+    def run_relevant_tests(self, verbose: bool = False) -> str:
+        """
+        Run the canonical failing tests specified by the SWEBench instance metadata.
+
+        Args:
+            verbose (bool): Whether to run tests in verbose mode when supported.
+
+        Returns:
+            Normalized test output, or a guidance message if no metadata is available.
+        """
+        try:
+            test_cmd = self.instance.get("test_cmd") or self.instance.get("test_command")
+            test_path = self.instance.get("test_path")
+
+            if not test_cmd and not test_path:
+                return "No recommended tests provided in instance metadata. Use run_test() to select tests manually."
+
+            if test_cmd:
+                command = str(test_cmd).strip()
+                if verbose and "pytest" in command and "-v" not in command:
+                    command = command + " -v"
+                output = self.env.execute(command)
+                if isinstance(output, dict):
+                    output = output.get("output", "") or output.get("stdout", "")
+                return self._normalize_output(output)
+
+            if isinstance(test_path, list):
+                # Join multiple paths into a single pytest invocation
+                joined_paths = " ".join(str(p).strip() for p in test_path if str(p).strip())
+                test_path_str = joined_paths or None
+            elif isinstance(test_path, str):
+                # Some instances store as JSON string or multi-line text
+                parts = [p.strip() for p in test_path.split("\n") if p.strip()]
+                test_path_str = " ".join(parts) if parts else None
+            else:
+                test_path_str = None
+
+            if not test_path_str:
+                return "Instance test metadata is empty. Use run_test() to select tests manually."
+
+            return self.run_test(test_path=test_path_str, verbose=verbose)
+        except Exception as e:
+            raise ValueError(f"Error running recommended tests: {e}")
 
     def check_syntax(self, file_path: str) -> str:
         """
@@ -603,6 +646,16 @@ except Exception as e:
             return f"Repository: {repo_name}\nRoot directory: {root_dir}"
         except Exception as e:
             return f"Repository: {self.instance.get('repo', 'unknown')}\nRoot directory: /testbed\n(Error getting details: {e})"
+
+    def git_status(self) -> str:
+        """Show the current git status in short form."""
+        try:
+            output = self.env.execute("git status --short")
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+            return self._normalize_output(output)
+        except Exception as e:
+            raise ValueError(f"Error getting git status: {e}")
 
     def show_code_structure(self, file_path: str) -> str:
         """

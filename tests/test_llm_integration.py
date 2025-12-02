@@ -65,8 +65,8 @@ class TestLLMLoggingIntegration(unittest.TestCase):
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_logging_only_last_message_on_subsequent_calls(self):
-        """Test that logging only includes last message on subsequent calls (no system prompt)."""
+    def test_logging_logs_full_messages_each_call(self):
+        """Test that logging records the full formatted messages on every call."""
 
         # First call - should include system prompt
         mock_response1 = Mock()
@@ -80,19 +80,57 @@ class TestLLMLoggingIntegration(unittest.TestCase):
 
         self.mock_client.responses.create.side_effect = [mock_response1, mock_response2]
 
-        # First call with full conversation including system prompt
         messages1 = [
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "first message"}
         ]
+        formatted1 = [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "output_text", "text": "You are a helpful assistant"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "first message"}
+                ],
+            },
+        ]
         self.llm.generate(messages1)
 
-        # Second call with full conversation (but only last message should be logged)
         messages2 = [
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "first message"},
             {"role": "assistant", "content": "First response"},
-            {"role": "user", "content": "second message"}
+            {"role": "user", "content": "second message"},
+        ]
+        formatted2 = [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "output_text", "text": "You are a helpful assistant"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "first message"}
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "output_text", "text": "First response"}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "output_text", "text": "second message"}
+                ],
+            },
         ]
         self.llm.generate(messages2)
 
@@ -105,24 +143,13 @@ class TestLLMLoggingIntegration(unittest.TestCase):
 
         self.assertEqual(len(lines), 2, "Should have 2 log entries")
 
-        # Parse first log entry
         entry1 = json.loads(lines[0])
         self.assertEqual(entry1["call_number"], 1)
-        self.assertEqual(len(entry1["messages"]), 2, "First call should log all messages including system")
-        self.assertEqual(entry1["messages"][0]["role"], "system")
-        self.assertEqual(entry1["messages"][1]["role"], "user")
-        self.assertEqual(entry1["messages"][1]["content"], "first message")
+        self.assertEqual(entry1["messages"], formatted1)
 
-        # Parse second log entry
         entry2 = json.loads(lines[1])
         self.assertEqual(entry2["call_number"], 2)
-        self.assertEqual(len(entry2["messages"]), 1, "Second call should only log last message")
-        self.assertEqual(entry2["messages"][0]["role"], "user")
-        self.assertEqual(entry2["messages"][0]["content"], "second message")
-        # Verify system prompt is NOT in second entry
-        system_messages = [msg for msg in entry2["messages"] if msg["role"] == "system"]
-        self.assertEqual(len(system_messages), 0, "System prompt should not be in second log entry")
-        self.assertEqual(entry2["previous_response_id"], "resp_123")
+        self.assertEqual(entry2["messages"], formatted2)
 
     def test_log_file_deletion_on_new_run(self):
         """Test that log file can be deleted and recreated."""

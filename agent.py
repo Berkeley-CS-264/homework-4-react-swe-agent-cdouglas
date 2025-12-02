@@ -43,23 +43,31 @@ class ReactAgent:
         # Track agent actions for finish validation
         self.made_edit: bool = False
         self.ran_tests_after_edit: bool = False
+        self.saw_failing_test: bool = False
+        self.last_test_had_failure: bool = False
 
         # Set up the initial structure of the history
         # Create required root nodes and a user node (task)
-        initial_system_content = """You are an autonomous software engineer fixing bugs in a repository. Your goal: resolve the issue and make tests pass.
+        initial_system_content = """You are an autonomous software engineer fixing bugs in a repository. Goal: resolve the issue and make the correct tests pass.
 
 # Constraints
 - No internet access. Use only the tools provided.
-- Do NOT modify tests unless the issue explicitly requires it.
+- Do NOT modify tests unless explicitly required.
 - Make minimal, targeted changes. Prefer small fixes over refactors.
+- Always end your reply with exactly ONE function call using the provided markers. Nothing may appear after ----END_FUNCTION_CALL----.
 
-# Workflow
-1. First action: Call get_repo_info(), then find_test_file() or grep() to locate relevant code.
-2. Locate the bug: Use grep(), find_files(), show_file(), or show_code_structure() to find relevant files.
-3. Reproduce: Run a failing test with run_test() or run_bash_cmd("pytest ..."). Use analyze_test_failure() to understand errors.
-4. Fix: Use replace_in_file() to make targeted changes. NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, etc.) in file content.
-5. Verify: Re-run tests after EVERY edit. If tests fail, analyze and iterate.
-6. Finish: Call finish() only when tests pass and you've run tests since your last edit.
+# Workflow (repeat until done)
+1) Reproduce: First action should gather repo info, then run the recommended failing test (prefer run_relevant_tests() or run_test()).
+2) Localize: Read the failing test and relevant implementation (show_file_snippet(), show_code_structure(), grep()).
+3) Edit: Apply a focused change with replace_in_file(). NEVER include function call markers in file content.
+4) Re-test: Re-run the same failing test(s) immediately after every edit. Use analyze_test_failure() on failures.
+5) (Optional) Broader sanity test if time permits.
+
+# Finish checklist (all must be true before calling finish())
+- You have seen at least one failing test that matches the issue.
+- You made at least one successful code edit with replace_in_file().
+- You re-ran tests after your last edit.
+- Your latest test run is clean (no FAILED/ERROR).
 
 # Critical Rules
 - Use replace_in_file() for ALL code changes. Do NOT use run_bash_cmd() to edit files.
@@ -67,7 +75,7 @@ class ReactAgent:
 - For large files, use show_file_snippet(path, start_line, end_line) instead of show_file().
 - Keep Thoughts concise (1-3 sentences). Call exactly ONE tool per Action.
 - NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, ----ARG----, ----VALUE----) in replace_in_file() content.
-- Do NOT call finish() if tests are failing or you haven't run tests since your last edit.
+- Do NOT call finish() if tests are failing or you haven't re-run tests since your last edit.
 
 # When Stuck
 - Re-read the issue description for missed details.
@@ -75,7 +83,7 @@ class ReactAgent:
 - Use show_code_structure() for large files before reading details.
 - Check edge cases: None values, empty inputs, type mismatches.
 - Call check_syntax() after significant Python file changes.
-
+- Use git_status() to verify files changed.
 """
 
         self.system_message_id = self.add_message("system", initial_system_content)
@@ -148,9 +156,9 @@ class ReactAgent:
         
         # Organize tools by category
         tool_categories = {
-            "Repository Information": ["get_repo_info"],
+            "Repository Information": ["get_repo_info", "git_status"],
             "File Operations": ["show_file", "replace_in_file", "grep", "find_files", "show_code_structure", "show_file_snippet"],
-            "Testing & Analysis": ["run_test", "analyze_test_failure", "find_test_file", "check_syntax"],
+            "Testing & Analysis": ["run_test", "run_relevant_tests", "analyze_test_failure", "find_test_file", "check_syntax"],
             "General": ["run_bash_cmd", "finish"],
         }
 
@@ -222,6 +230,28 @@ class ReactAgent:
         """
         # Set the user task message
         self.set_message_content(self.user_message_id, task)
+
+        def _is_test_command(command: str) -> bool:
+            if not command:
+                return False
+            command_lower = command.lower()
+            return (
+                "pytest" in command_lower
+                or "python -m pytest" in command_lower
+                or "python -m unittest" in command_lower
+                or "unittest" in command_lower
+                or "make test" in command_lower
+                or (
+                    "test" in command_lower
+                    and any(keyword in command_lower for keyword in ["test_", "tests/", "/test"])
+                )
+            )
+
+        def _has_test_failure(output: str) -> bool:
+            if not isinstance(output, str):
+                return False
+            upper = output.upper()
+            return any(token in upper for token in ["FAILED", "ERROR", "TRACEBACK", "EXCEPTION", "FAILURES"])
         
         # Main ReAct loop
         for step in range(max_steps):
@@ -268,6 +298,12 @@ class ReactAgent:
             # Check if finish was called
             if function_call["name"] == "finish":
                 # Enforce simple guards
+                if not self.saw_failing_test:
+                    self.add_message(
+                        "user",
+                        "You have not reproduced a failing test yet. Run the recommended failing test with run_relevant_tests() or run_test() before finishing."
+                    )
+                    continue
                 if not self.made_edit:
                     self.add_message(
                         "user",
@@ -277,7 +313,13 @@ class ReactAgent:
                 if not self.ran_tests_after_edit:
                     self.add_message(
                         "user",
-                        "You have not run tests since your last code change. Run tests with run_test() or run_bash_cmd('pytest ...') before calling finish()."
+                        "You have not run tests since your last code change. Re-run the failing test with run_relevant_tests() or run_test() before calling finish()."
+                    )
+                    continue
+                if self.last_test_had_failure:
+                    self.add_message(
+                        "user",
+                        "Your most recent test run still shows failures. Fix the issue and re-run tests before calling finish()."
                     )
                     continue
                 result = self.function_map["finish"](**function_call["arguments"])
@@ -296,23 +338,32 @@ class ReactAgent:
 
                 # Update flags
                 if function_call["name"] == "replace_in_file":
-                    self.made_edit = True
-                    self.ran_tests_after_edit = False
-                elif function_call["name"] == "run_test":
+                    lowered = result.lower() if isinstance(result, str) else ""
+                    success = (
+                        isinstance(result, str)
+                        and "successfully replaced" in lowered
+                        and "error" not in lowered
+                        and "timeout" not in lowered
+                    )
+                    if success:
+                        self.made_edit = True
+                        self.ran_tests_after_edit = False
+                elif function_call["name"] in {"run_test", "run_relevant_tests"}:
+                    has_failure = _has_test_failure(result)
+                    self.last_test_had_failure = has_failure
+                    if has_failure:
+                        self.saw_failing_test = True
                     if self.made_edit:
                         self.ran_tests_after_edit = True
                 elif function_call["name"] == "run_bash_cmd":
-                    command = function_call["arguments"].get("command", "").lower()
-                    # Detect various test execution patterns
-                    is_test_command = (
-                        "pytest" in command or
-                        "python -m pytest" in command or
-                        "python -m unittest" in command or
-                        "make test" in command or
-                        ("test" in command and any(keyword in command for keyword in ["test_", "tests/", "/test"]))
-                    )
-                    if is_test_command and self.made_edit:
-                        self.ran_tests_after_edit = True
+                    command = function_call["arguments"].get("command", "")
+                    if _is_test_command(command):
+                        has_failure = _has_test_failure(result)
+                        self.last_test_had_failure = has_failure
+                        if has_failure:
+                            self.saw_failing_test = True
+                        if self.made_edit:
+                            self.ran_tests_after_edit = True
 
                 # Add tool result as observation (user message)
                 self.add_message("user", f"Observation: {result}")
