@@ -654,7 +654,7 @@ class AnotherClass:
                          side_effect=ValueError("python3: can't open file '/tmp/tmp123.py': [Errno 2] No such file or directory")):
             result = self.env_wrapper.replace_in_file("test.py", 1, 1, "content")
             self.assertIn("Temporary script file not found in container", result)
-            self.assertIn("try the replace_in_file() call again", result)
+            self.assertIn("retry the replace_in_file() call", result)
 
 
 

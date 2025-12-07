@@ -168,69 +168,69 @@ class TestAgentFinishValidation(unittest.TestCase):
         agent2 = ReactAgent("test-agent-2", self.parser, llm2)
 
         # Add mock functions
-        def mock_replace_in_file(file_path, from_line, to_line, content):
+        def replace_in_file(file_path, from_line, to_line, content):
             return f"Successfully replaced lines {from_line} to {to_line} in {file_path}"
 
         test_outputs = ["FAILED", "PASSED"]
 
-        def mock_run_test(test_path=None, test_name=None, verbose=False):
+        def run_test(test_path=None, test_name=None, verbose=False):
             return test_outputs.pop(0) if test_outputs else "PASSED"
 
-        agent2.add_functions([mock_replace_in_file, mock_run_test])
+        agent2.add_functions([replace_in_file, run_test])
 
         # Set up LLM to: reproduce failure, make edit, rerun tests, then finish
         reproduce_call = (
-            "I'll reproduce the failure first.\n",
-            "----BEGIN_FUNCTION_CALL----\n",
-            "run_test\n",
-            "----ARG----\n",
-            "test_path\n",
-            "----VALUE----\n",
-            "test.py\n",
-            "----END_FUNCTION_CALL----",
+            "I'll reproduce the failure first.\n"
+            "----BEGIN_FUNCTION_CALL----\n"
+            "run_test\n"
+            "----ARG----\n"
+            "test_path\n"
+            "----VALUE----\n"
+            "test.py\n"
+            "----END_FUNCTION_CALL----"
         )
         edit_call = (
-            "I'll make a change.\n",
-            "----BEGIN_FUNCTION_CALL----\n",
-            "replace_in_file\n",
-            "----ARG----\n",
-            "file_path\n",
-            "----VALUE----\n",
-            "test.py\n",
-            "----ARG----\n",
-            "from_line\n",
-            "----VALUE----\n",
-            "1\n",
-            "----ARG----\n",
-            "to_line\n",
-            "----VALUE----\n",
-            "1\n",
-            "----ARG----\n",
-            "content\n",
-            "----VALUE----\n",
-            "new code\n",
-            "----END_FUNCTION_CALL----",
+            "I'll make a change.\n"
+            "----BEGIN_FUNCTION_CALL----\n"
+            "replace_in_file\n"
+            "----ARG----\n"
+            "file_path\n"
+            "----VALUE----\n"
+            "test.py\n"
+            "----ARG----\n"
+            "from_line\n"
+            "----VALUE----\n"
+            "1\n"
+            "----ARG----\n"
+            "to_line\n"
+            "----VALUE----\n"
+            "1\n"
+            "----ARG----\n"
+            "content\n"
+            "----VALUE----\n"
+            "new code\n"
+            "----END_FUNCTION_CALL----"
         )
         test_call = (
-            "Now I'll rerun tests.\n",
-            "----BEGIN_FUNCTION_CALL----\n",
-            "run_test\n",
-            "----ARG----\n",
-            "test_path\n",
-            "----VALUE----\n",
-            "test.py\n",
-            "----END_FUNCTION_CALL----",
+            "Now I'll rerun tests.\n"
+            "----BEGIN_FUNCTION_CALL----\n"
+            "run_test\n"
+            "----ARG----\n"
+            "test_path\n"
+            "----VALUE----\n"
+            "test.py\n"
+            "----END_FUNCTION_CALL----"
         )
 
         finish_call = (
-            "Tests passed, I'll finish.\n",
-            "----BEGIN_FUNCTION_CALL----\n",
-            "finish\n",
-            "----ARG----\n",
-            "result\n",
-            "----VALUE----\n",
-            "Fixed the issue\n",
-            "----END_FUNCTION_CALL----",
+            "Tests passed, I'll finish.\n"
+            "----BEGIN_FUNCTION_CALL----\n"
+            "finish\n"
+            "----ARG----\n"
+            "result\n"
+            "----VALUE----\n"
+            "Fixed the issue\n"
+            "----END_FUNCTION_CALL----"
         )
         # Set LLM responses for this test
         llm2.responses = [reproduce_call, edit_call, test_call, finish_call]
@@ -281,16 +281,16 @@ class TestAgentFinishValidation(unittest.TestCase):
         agent4 = ReactAgent("test-agent-4", self.parser, self.llm)
 
         # Add mock functions
-        def mock_replace_in_file(file_path, from_line, to_line, content):
+        def replace_in_file(file_path, from_line, to_line, content):
             return f"Successfully replaced lines {from_line} to {to_line} in {file_path}"
 
-        def mock_run_test(test_path=None, test_name=None, verbose=False):
+        def run_test(test_path=None, test_name=None, verbose=False):
             return "PASSED"
 
-        def mock_grep(pattern, file_pattern="*", case_sensitive=True):
+        def grep(pattern, file_pattern="*", case_sensitive=True):
             return "No matches found"
 
-        agent4.add_functions([mock_replace_in_file, mock_run_test, mock_grep])
+        agent4.add_functions([replace_in_file, run_test, grep])
 
         # Set up LLM to make edit and run test, then hit max_steps
         edit_call = (

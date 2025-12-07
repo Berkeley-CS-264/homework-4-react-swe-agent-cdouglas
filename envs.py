@@ -208,6 +208,44 @@ class SWEEnvironment:
                 from_line = 1
             if to_line < 1:
                 to_line = 1
+
+            # Add validation guardrails to prevent destructive edits
+            # First, we need to get the file length to validate the edit scope
+            try:
+                # Get file info to validate edit scope
+                wc_output = self.env.execute(f"wc -l '{file_path}' 2>/dev/null || echo '0'")
+                if isinstance(wc_output, dict):
+                    wc_output = wc_output.get("output", "") or wc_output.get("stdout", "")
+                file_line_count = int(wc_output.strip().split()[0]) if wc_output.strip() else 0
+
+                # Calculate edit scope
+                lines_being_replaced = to_line - from_line + 1
+                new_content_lines = len(content.splitlines()) if content.strip() else 0
+
+                # Validation 1: Warn if replacing >50% of a file with very little content
+                if file_line_count > 20:  # Only check for files with substantial content
+                    replace_percentage = (lines_being_replaced / file_line_count) * 100
+                    if replace_percentage > 50 and new_content_lines < 10:
+                        return (f"Warning: This edit would replace {lines_being_replaced} lines ({replace_percentage:.0f}% of the file) "
+                               f"with only {new_content_lines} lines of new content. This seems like an overly broad replacement. "
+                               f"File '{file_path}' has {file_line_count} lines total. "
+                               f"Consider replacing a smaller, more targeted section of the file. "
+                               f"Use show_file_snippet() to read the specific function/class you need to modify, "
+                               f"then replace only those specific lines.")
+
+                # Validation 2: Warn if replacing nearly the entire file (>80%)
+                if file_line_count > 10:
+                    replace_percentage = (lines_being_replaced / file_line_count) * 100
+                    if replace_percentage > 80:
+                        return (f"Warning: This edit would replace {lines_being_replaced} out of {file_line_count} lines "
+                               f"({replace_percentage:.0f}% of the entire file). "
+                               f"This is likely too broad. Make targeted edits to specific functions/classes instead. "
+                               f"Use show_code_structure('{file_path}') to see the file structure, "
+                               f"then show_file_snippet('{file_path}', start, end) to read specific sections.")
+            except:
+                # If validation fails, proceed with the edit (don't block on validation errors)
+                pass
+
             # Use Python to safely replace lines in the file
             # We'll use base64 encoding to safely pass the content through the command line
             import base64

@@ -57,33 +57,41 @@ class ReactAgent:
 - Always end your reply with exactly ONE function call using the provided markers. Nothing may appear after ----END_FUNCTION_CALL----.
 
 # Workflow (repeat until done)
-1) Reproduce: First action should gather repo info, then run the recommended failing test (prefer run_relevant_tests() or run_test()).
-2) Localize: Read the failing test and relevant implementation (show_file_snippet(), show_code_structure(), grep()).
-3) Edit: Apply a focused change with replace_in_file(). NEVER include function call markers in file content.
-4) Re-test: Re-run the same failing test(s) immediately after every edit. Use analyze_test_failure() on failures.
-5) (Optional) Broader sanity test if time permits.
+1) Reproduce: First action should be get_repo_info(), then run the recommended failing test (use run_relevant_tests() first, or run_test() with specific test path).
+2) Localize: Use analyze_test_failure() to understand errors. Use grep() to find relevant code patterns. Use show_code_structure() to understand file organization before reading.
+3) Inspect: Read ONLY the specific functions/classes that need changes using show_file_snippet(). Do NOT read entire large files.
+4) Edit: Apply a focused, surgical change with replace_in_file(). Replace ONLY the exact lines that need modification - typically 1-20 lines. NEVER replace entire functions or files unless absolutely necessary.
+5) Re-test: Re-run the SAME failing test(s) immediately after every edit. Use analyze_test_failure() if tests still fail to understand what's wrong.
+6) Verify: Use check_syntax() after Python edits. Use git_status() to see what files changed.
 
 # Finish checklist (all must be true before calling finish())
-- You have seen at least one failing test that matches the issue.
+- You have seen at least one failing test that matches the issue description.
 - You made at least one successful code edit with replace_in_file().
 - You re-ran tests after your last edit.
-- Your latest test run is clean (no FAILED/ERROR).
+- Your latest test run shows all tests PASSED (no FAILED/ERROR in output).
 
-# Critical Rules
+# Critical Rules for Edits
 - Use replace_in_file() for ALL code changes. Do NOT use run_bash_cmd() to edit files.
-- Run tests BEFORE your first edit and AFTER every edit.
-- For large files, use show_file_snippet(path, start_line, end_line) instead of show_file().
-- Keep Thoughts concise (1-3 sentences). Call exactly ONE tool per Action.
-- NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, ----ARG----, ----VALUE----) in replace_in_file() content.
-- Do NOT call finish() if tests are failing or you haven't re-run tests since your last edit.
+- BEFORE editing: Use show_file_snippet() or show_file() to see the EXACT current content and line numbers.
+- AFTER editing: ALWAYS re-run tests to verify the change worked.
+- Edit scope: Replace only what's necessary (typically 1-20 lines). Avoid replacing entire functions/classes/files.
+- Line numbers: Use show_file() or show_file_snippet() to get accurate line numbers before calling replace_in_file().
+- NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, ----ARG----, ----VALUE----) in the content parameter of replace_in_file().
+
+# Efficient Tool Usage
+- show_file(): Use for small files (<50 lines). Returns first 200 lines with line numbers.
+- show_file_snippet(path, start_line, end_line): Use for specific sections of large files. More efficient than show_file().
+- show_code_structure(): Use FIRST for large files to see structure, then use show_file_snippet() to read specific functions.
+- grep(pattern, file_pattern): Use to search across files for specific patterns or function names.
+- find_files(name_pattern): Use to locate files by name when you don't know the exact path.
 
 # When Stuck
 - Re-read the issue description for missed details.
-- Use analyze_test_failure() to extract error types and locations.
-- Use show_code_structure() for large files before reading details.
-- Check edge cases: None values, empty inputs, type mismatches.
-- Call check_syntax() after significant Python file changes.
-- Use git_status() to verify files changed.
+- Use analyze_test_failure() to extract precise error messages and line numbers.
+- Check if your edit actually changed what you intended - re-read the file with show_file_snippet() after editing.
+- Check edge cases: None values, empty inputs, type mismatches, missing imports.
+- Consider if the issue is in a different file than you think - use grep() to search broadly.
+- If tests pass locally but the issue persists, ensure you're testing the right thing.
 """
 
         self.system_message_id = self.add_message("system", initial_system_content)
