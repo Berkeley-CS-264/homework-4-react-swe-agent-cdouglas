@@ -48,50 +48,31 @@ class ReactAgent:
 
         # Set up the initial structure of the history
         # Create required root nodes and a user node (task)
-        initial_system_content = """You are an autonomous software engineer fixing bugs in a repository. Goal: resolve the issue and make the correct tests pass.
+        initial_system_content = """You are fixing bugs in a repository. Make tests pass with minimal changes.
 
-# Constraints
-- No internet access. Use only the tools provided.
-- Do NOT modify tests unless explicitly required.
-- Make minimal, targeted changes. Prefer small fixes over refactors.
-- Always end your reply with exactly ONE function call using the provided markers. Nothing may appear after ----END_FUNCTION_CALL----.
+# Workflow
+1. Reproduce: get_repo_info(), then run_relevant_tests()
+2. Fix: Use grep() to find code, show_file_snippet() to read it, replace_in_file() to edit
+3. Verify: Re-run tests after EVERY edit
+4. Finish: Call finish() only when tests pass
 
-# Workflow (repeat until done)
-1) Reproduce: First action should be get_repo_info(), then run the recommended failing test (use run_relevant_tests() first, or run_test() with specific test path).
-2) Localize: Use analyze_test_failure() to understand errors. Use grep() to find relevant code patterns. Use show_code_structure() to understand file organization before reading.
-3) Inspect: Read ONLY the specific functions/classes that need changes using show_file_snippet(). Do NOT read entire large files.
-4) Edit: Apply a focused, surgical change with replace_in_file(). Replace ONLY the exact lines that need modification - typically 1-20 lines. NEVER replace entire functions or files unless absolutely necessary.
-5) Re-test: Re-run the SAME failing test(s) immediately after every edit. Use analyze_test_failure() if tests still fail to understand what's wrong.
-6) Verify: Use check_syntax() after Python edits. Use git_status() to see what files changed.
+# Rules
+- Use replace_in_file() for edits (never run_bash_cmd)
+- Read file before editing to get exact content
+- Edit only 1-20 lines at a time
+- Always re-run tests after editing
+- Don't modify test files
 
-# Finish checklist (all must be true before calling finish())
-- You have seen at least one failing test that matches the issue description.
-- You made at least one successful code edit with replace_in_file().
-- You re-ran tests after your last edit.
-- Your latest test run shows all tests PASSED (no FAILED/ERROR in output).
+# Tool Tips
+- grep(): Use specific patterns like "def function_name" or "class ClassName"
+- show_file_snippet(): Always use for large files, specify line range
+- replace_in_file(): Copy exact text with whitespace. Read file first.
+- find_files(): Search by filename pattern when path unknown
 
-# Critical Rules for Edits
-- Use replace_in_file() for ALL code changes. Do NOT use run_bash_cmd() to edit files.
-- BEFORE editing: Use show_file_snippet() or show_file() to see the EXACT current content and line numbers.
-- AFTER editing: ALWAYS re-run tests to verify the change worked.
-- Edit scope: Replace only what's necessary (typically 1-20 lines). Avoid replacing entire functions/classes/files.
-- Line numbers: Use show_file() or show_file_snippet() to get accurate line numbers before calling replace_in_file().
-- NEVER include function call markers (----BEGIN_FUNCTION_CALL----, ----END_FUNCTION_CALL----, ----ARG----, ----VALUE----) in the content parameter of replace_in_file().
-
-# Efficient Tool Usage
-- show_file(): Use for small files (<50 lines). Returns first 200 lines with line numbers.
-- show_file_snippet(path, start_line, end_line): Use for specific sections of large files. More efficient than show_file().
-- show_code_structure(): Use FIRST for large files to see structure, then use show_file_snippet() to read specific functions.
-- grep(pattern, file_pattern): Use to search across files for specific patterns or function names.
-- find_files(name_pattern): Use to locate files by name when you don't know the exact path.
-
-# When Stuck
-- Re-read the issue description for missed details.
-- Use analyze_test_failure() to extract precise error messages and line numbers.
-- Check if your edit actually changed what you intended - re-read the file with show_file_snippet() after editing.
-- Check edge cases: None values, empty inputs, type mismatches, missing imports.
-- Consider if the issue is in a different file than you think - use grep() to search broadly.
-- If tests pass locally but the issue persists, ensure you're testing the right thing.
+# Before finish():
+- Made at least one edit
+- Re-ran tests after last edit
+- Latest test run shows PASSED
 """
 
         self.system_message_id = self.add_message("system", initial_system_content)
@@ -306,12 +287,6 @@ class ReactAgent:
             # Check if finish was called
             if function_call["name"] == "finish":
                 # Enforce simple guards
-                if not self.saw_failing_test:
-                    self.add_message(
-                        "user",
-                        "You have not reproduced a failing test yet. Run the recommended failing test with run_relevant_tests() or run_test() before finishing."
-                    )
-                    continue
                 if not self.made_edit:
                     self.add_message(
                         "user",
@@ -321,13 +296,7 @@ class ReactAgent:
                 if not self.ran_tests_after_edit:
                     self.add_message(
                         "user",
-                        "You have not run tests since your last code change. Re-run the failing test with run_relevant_tests() or run_test() before calling finish()."
-                    )
-                    continue
-                if self.last_test_had_failure:
-                    self.add_message(
-                        "user",
-                        "Your most recent test run still shows failures. Fix the issue and re-run tests before calling finish()."
+                        "You have not run tests since your last code change. Re-run tests with run_relevant_tests() or run_test() before calling finish()."
                     )
                     continue
                 result = self.function_map["finish"](**function_call["arguments"])
@@ -363,6 +332,11 @@ class ReactAgent:
                         self.saw_failing_test = True
                     if self.made_edit:
                         self.ran_tests_after_edit = True
+
+                    # Early success detection
+                    if not has_failure and self.made_edit and self.ran_tests_after_edit:
+                        result = result + "\n\n✓ Tests passing! You can call finish() now."
+
                 elif function_call["name"] == "run_bash_cmd":
                     command = function_call["arguments"].get("command", "")
                     if _is_test_command(command):
@@ -373,23 +347,42 @@ class ReactAgent:
                         if self.made_edit:
                             self.ran_tests_after_edit = True
 
+                        # Early success detection
+                        if not has_failure and self.made_edit and self.ran_tests_after_edit:
+                            result = result + "\n\n✓ Tests passing! You can call finish() now."
+
                 # Add tool result as observation (user message)
                 self.add_message("user", f"Observation: {result}")
             except ValueError as e:
                 # ValueError usually indicates a user error (bad arguments, validation failure)
-                # Provide helpful context and suggestions
-                error_msg = f"Error executing {function_call['name']}: {str(e)}"
-                if "function call marker" in str(e).lower():
-                    error_msg += "\nTip: When using replace_in_file(), only include the actual code content. Do not include function call markers (----BEGIN_FUNCTION_CALL----, etc.) in the content parameter."
-                elif "not found" in str(e).lower() or "does not exist" in str(e).lower():
-                    error_msg += "\nTip: Use find_files() or grep() to locate the correct file path."
+                # Provide helpful context and recovery suggestions
+                error_msg = f"Error: {str(e)}"
+                error_lower = str(e).lower()
+
+                # Add specific recovery suggestions
+                if "function call marker" in error_lower:
+                    error_msg += "\nFix: Don't include markers in content. Only include actual code."
+                elif "not found" in error_lower or "does not exist" in error_lower:
+                    error_msg += "\nFix: Use find_files('pattern') or grep('pattern', '*.py') to locate the file."
+                elif "no such file" in error_lower:
+                    error_msg += "\nFix: Check file path. Use find_files() to search for it."
+                elif "old_text" in error_lower or "not match" in error_lower:
+                    error_msg += "\nFix: Read the file first with show_file_snippet() to see exact content."
+                elif "parse" in error_lower or "format" in error_lower:
+                    error_msg += "\nFix: Check your function call format. End with ----END_FUNCTION_CALL----"
+
                 self.add_message("user", error_msg)
             except Exception as e:
                 # Other exceptions (system errors, etc.)
-                error_msg = (
-                    f"Error executing {function_call['name']}: {type(e).__name__}: {str(e)}\n"
-                    f"Arguments used: {function_call.get('arguments', {})}"
-                )
+                error_type = type(e).__name__
+                error_msg = f"Error ({error_type}): {str(e)}"
+
+                # Add recovery hint based on error type
+                if "timeout" in str(e).lower():
+                    error_msg += "\nThe command took too long. Try a simpler approach."
+                elif "permission" in str(e).lower():
+                    error_msg += "\nPermission denied. Check if the file/command is accessible."
+
                 self.add_message("user", error_msg)
         
         # Max steps reached

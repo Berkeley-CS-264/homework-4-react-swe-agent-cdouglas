@@ -92,11 +92,9 @@ def process_instance(
             env.find_files,
             env.run_relevant_tests,
             env.run_test,
-            env.analyze_test_failure,
-            env.find_test_file,
-            env.show_code_structure,
-            env.check_syntax,
             env.show_file_snippet,
+            env.analyze_test_failure,
+            env.show_code_structure,
         ])
 
         # Run the agent
