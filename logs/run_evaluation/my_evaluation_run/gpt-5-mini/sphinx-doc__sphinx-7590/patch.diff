@@ -1,0 +1,76 @@
+diff --git a/sphinx/domains/cpp.py b/sphinx/domains/cpp.py
+index fe52d881d..dc2bcc337 100644
+--- a/sphinx/domains/cpp.py
++++ b/sphinx/domains/cpp.py
+@@ -854,6 +854,32 @@ class ASTStringLiteral(ASTLiteral):
+         txt = str(self)
+         signode.append(nodes.Text(txt, txt))
+
++class ASTUserDefinedLiteral(ASTLiteral):
++    def __init__(self, literal: ASTLiteral, suffix: ASTIdentifier) -> None:
++        # literal is the primary literal node (number, string, or char)
++        self.literal = literal
++        self.suffix = suffix
++
++    def _stringify(self, transform: StringifyTransform) -> str:
++        # user-defined literals are written as <literal><suffix>
++        return transform(self.literal) + transform(self.suffix)
++
++    def get_id(self, version: int) -> str:
++        # For id generation, mirror operator literal style: 'li' + suffix id for v>=2
++        if version == 1:
++            # old id scheme not supported for UDLs
++            raise NoOldIdError()
++        return 'li' + self.suffix.get_id(version)
++
++    def describe_signature(self, signode: TextElement, mode: str,
++                           env: "BuildEnvironment", symbol: "Symbol") -> None:
++        # display the literal followed by the suffix
++        verify_description_mode(mode)
++        # display literal
++        self.literal.describe_signature(signode, mode, env, symbol)
++        # then suffix (as identifier text)
++        signode.append(nodes.Text(str(self.suffix), str(self.suffix)))
++
+
+ class ASTCharLiteral(ASTLiteral):
+     def __init__(self, prefix: str, data: str) -> None:
+@@ -4664,18 +4690,35 @@ class DefinitionParser(BaseParser):
+             if self.match(regex):
+                 while self.current_char in 'uUlLfF':
+                     self.pos += 1
+-                return ASTNumberLiteral(self.definition[pos:self.pos])
++                lit = ASTNumberLiteral(self.definition[pos:self.pos])
++                # check for user-defined literal suffix immediately following (no whitespace)
++                if self.match(identifier_re):
++                    # matched_text contains the suffix; ensure no space between literal and suffix
++                    suffix_txt = self.matched_text
++                    suffix = ASTIdentifier(suffix_txt)
++                    return ASTUserDefinedLiteral(lit, suffix)
++                return lit
+
+         string = self._parse_string()
+         if string is not None:
+-            return ASTStringLiteral(string)
++            lit = ASTStringLiteral(string)
++            # check for UDL suffix immediately after string literal (no whitespace)
++            if self.match(identifier_re):
++                suffix = ASTIdentifier(self.matched_text)
++                return ASTUserDefinedLiteral(lit, suffix)
++            return lit
+
+         # character-literal
+         if self.match(char_literal_re):
+             prefix = self.last_match.group(1)  # may be None when no prefix
+             data = self.last_match.group(2)
+             try:
+-                return ASTCharLiteral(prefix, data)
++                lit = ASTCharLiteral(prefix, data)
++                # check for UDL suffix immediately after character literal (no whitespace)
++                if self.match(identifier_re):
++                    suffix = ASTIdentifier(self.matched_text)
++                    return ASTUserDefinedLiteral(lit, suffix)
++                return lit
+             except UnicodeDecodeError as e:
+                 self.fail("Can not handle character literal. Internal error was: %s" % e)
+             except UnsupportedMultiCharacterCharLiteral:

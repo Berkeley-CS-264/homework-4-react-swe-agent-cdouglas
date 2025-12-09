@@ -1,0 +1,25 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 87707d48f..080b5393d 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -115,6 +115,12 @@ def restify(cls: Optional[Type]) -> str:
+             return '...'
+         elif isinstance(cls, str):
+             return cls
++        # If a mocked object provides a __display_name__, prefer that.
++        # This avoids empty __qualname__ values (seen in mocked classes)
++        # producing outputs like "torch.nn." instead of "torch.nn.Module".
++        display = getattr(cls, '__display_name__', None)
++        if isinstance(display, str) and display:
++            return ':py:class:`%s`' % display
+         elif cls in INVALID_BUILTIN_CLASSES:
+             return ':py:class:`%s`' % INVALID_BUILTIN_CLASSES[cls]
+         elif inspect.isNewType(cls):
+@@ -145,6 +151,7 @@ def restify(cls: Optional[Type]) -> str:
+                 return _restify_py36(cls)
+     except (AttributeError, TypeError):
+         return repr(cls)
++        return repr(cls)
+
+
+ def _restify_py37(cls: Optional[Type]) -> str:

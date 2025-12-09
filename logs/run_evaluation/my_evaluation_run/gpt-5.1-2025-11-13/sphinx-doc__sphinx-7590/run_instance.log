@@ -1,0 +1,42 @@
+2025-12-09 13:50:42,481 - INFO - Creating container for sphinx-doc__sphinx-7590...
+2025-12-09 13:50:42,621 - INFO - Container for sphinx-doc__sphinx-7590 created: 51ea034823f2dd5fb54f8c93d10a2ddda707dbdbbe2aad0e6cf1e81673ce5762
+2025-12-09 13:50:43,362 - INFO - Container for sphinx-doc__sphinx-7590 started: 51ea034823f2dd5fb54f8c93d10a2ddda707dbdbbe2aad0e6cf1e81673ce5762
+2025-12-09 13:50:43,363 - INFO - Intermediate patch for sphinx-doc__sphinx-7590 written to logs/run_evaluation/my_evaluation_run/gpt-5.1-2025-11-13/sphinx-doc__sphinx-7590/patch.diff, now applying to container...
+2025-12-09 13:50:43,645 - INFO - Failed to apply patch to container: git apply --verbose
+2025-12-09 13:50:43,797 - INFO - Failed to apply patch to container: git apply --verbose --reject
+2025-12-09 13:50:43,902 - INFO - >>>>> Applied Patch:
+patching file sphinx/domains/cpp.py
+patch unexpectedly ends in middle of line
+Hunk #1 succeeded at 1 with fuzz 2.
+
+2025-12-09 13:50:44,709 - INFO - Git diff before:
+diff --git a/sphinx/domains/cpp.py b/sphinx/domains/cpp.py
+index fe52d881d..900d0121f 100644
+--- a/sphinx/domains/cpp.py
++++ b/sphinx/domains/cpp.py
+@@ -1,4 +1,5 @@
+-"""
++"""C++ domain."""
++----END_FUNCTION_CALL
+     sphinx.domains.cpp
+     ~~~~~~~~~~~~~~~~~~
+2025-12-09 13:50:44,710 - INFO - Eval script for sphinx-doc__sphinx-7590 written to logs/run_evaluation/my_evaluation_run/gpt-5.1-2025-11-13/sphinx-doc__sphinx-7590/eval.sh; copying to container...
+2025-12-09 13:50:51,642 - INFO - Test runtime: 6.81 seconds
+2025-12-09 13:50:51,643 - INFO - Test output for sphinx-doc__sphinx-7590 written to logs/run_evaluation/my_evaluation_run/gpt-5.1-2025-11-13/sphinx-doc__sphinx-7590/test_output.txt
+2025-12-09 13:50:51,741 - INFO - Git diff after:
+diff --git a/sphinx/domains/cpp.py b/sphinx/domains/cpp.py
+index fe52d881d..900d0121f 100644
+--- a/sphinx/domains/cpp.py
++++ b/sphinx/domains/cpp.py
+@@ -1,4 +1,5 @@
+-"""
++"""C++ domain."""
++----END_FUNCTION_CALL
+     sphinx.domains.cpp
+     ~~~~~~~~~~~~~~~~~~
+2025-12-09 13:50:51,742 - INFO - Grading answer for sphinx-doc__sphinx-7590...
+2025-12-09 13:50:51,743 - INFO - report: {'sphinx-doc__sphinx-7590': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': [], 'failure': ['tests/test_domain_cpp.py::test_expressions']}, 'PASS_TO_PASS': {'success': [], 'failure': ['tests/test_domain_cpp.py::test_fundamental_types', 'tests/test_domain_cpp.py::test_type_definitions', 'tests/test_domain_cpp.py::test_concept_definitions', 'tests/test_domain_cpp.py::test_member_definitions', 'tests/test_domain_cpp.py::test_function_definitions', 'tests/test_domain_cpp.py::test_operators', 'tests/test_domain_cpp.py::test_class_definitions', 'tests/test_domain_cpp.py::test_union_definitions', 'tests/test_domain_cpp.py::test_enum_definitions', 'tests/test_domain_cpp.py::test_anon_definitions', 'tests/test_domain_cpp.py::test_templates', 'tests/test_domain_cpp.py::test_template_args', 'tests/test_domain_cpp.py::test_initializers', 'tests/test_domain_cpp.py::test_attributes', 'tests/test_domain_cpp.py::test_xref_parsing', 'tests/test_domain_cpp.py::test_build_domain_cpp_multi_decl_lookup', 'tests/test_domain_cpp.py::test_build_domain_cpp_warn_template_param_qualified_name', 'tests/test_domain_cpp.py::test_build_domain_cpp_backslash_ok', 'tests/test_domain_cpp.py::test_build_domain_cpp_semicolon', 'tests/test_domain_cpp.py::test_build_domain_cpp_anon_dup_decl', 'tests/test_domain_cpp.py::test_build_domain_cpp_misuse_of_roles', 'tests/test_domain_cpp.py::test_build_domain_cpp_with_add_function_parentheses_is_True', 'tests/test_domain_cpp.py::test_build_domain_cpp_with_add_function_parentheses_is_False', 'tests/test_domain_cpp.py::test_xref_consistency']}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for sphinx-doc__sphinx-7590: resolved: False
+2025-12-09 13:50:51,743 - INFO - Attempting to stop container sweb.eval.sphinx-doc__sphinx-7590.my_evaluation_run...
+2025-12-09 13:51:10,081 - INFO - Attempting to remove container sweb.eval.sphinx-doc__sphinx-7590.my_evaluation_run...
+2025-12-09 13:51:10,146 - INFO - Container sweb.eval.sphinx-doc__sphinx-7590.my_evaluation_run removed.

@@ -1,0 +1,46 @@
+2025-11-26 14:17:35,690 - INFO - Creating container for django__django-14053...
+2025-11-26 14:17:35,892 - INFO - Container for django__django-14053 created: 94c04bc81d3cb366ad2a57754f988183a4ec763cd9ae509013a213336b10f7ca
+2025-11-26 14:17:37,359 - INFO - Container for django__django-14053 started: 94c04bc81d3cb366ad2a57754f988183a4ec763cd9ae509013a213336b10f7ca
+2025-11-26 14:17:37,360 - INFO - Intermediate patch for django__django-14053 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/django__django-14053/patch.diff, now applying to container...
+2025-11-26 14:17:37,575 - INFO - Failed to apply patch to container: git apply --verbose
+2025-11-26 14:17:37,666 - INFO - Failed to apply patch to container: git apply --verbose --reject
+2025-11-26 14:17:37,780 - INFO - >>>>> Applied Patch:
+patching file django/contrib/staticfiles/management/commands/collectstatic.py
+patch unexpectedly ends in middle of line
+Hunk #1 succeeded at 135 with fuzz 1.
+
+2025-11-26 14:17:39,111 - INFO - Git diff before:
+diff --git a/django/contrib/staticfiles/management/commands/collectstatic.py b/django/contrib/staticfiles/management/commands/collectstatic.py
+index f7e069b20b..cfef3682d1 100644
+--- a/django/contrib/staticfiles/management/commands/collectstatic.py
++++ b/django/contrib/staticfiles/management/commands/collectstatic.py
+@@ -135,6 +135,7 @@ class Command(BaseCommand):
+                 if processed:
+                     self.log("Post-processed '%s' as '%s'" %
+                              (original_path, processed_path), level=2)
++                    if original_path not in self.post_processed_files:
+                     self.post_processed_files.append(original_path)
+                 else:
+                     self.log("Skipped post-processing '%s'" % original_path)
+2025-11-26 14:17:39,111 - INFO - Eval script for django__django-14053 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/django__django-14053/eval.sh; copying to container...
+2025-11-26 14:17:50,149 - INFO - Test runtime: 10.95 seconds
+2025-11-26 14:17:50,149 - INFO - Test output for django__django-14053 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/django__django-14053/test_output.txt
+2025-11-26 14:17:50,230 - INFO - Git diff after:
+diff --git a/django/contrib/staticfiles/management/commands/collectstatic.py b/django/contrib/staticfiles/management/commands/collectstatic.py
+index f7e069b20b..cfef3682d1 100644
+--- a/django/contrib/staticfiles/management/commands/collectstatic.py
++++ b/django/contrib/staticfiles/management/commands/collectstatic.py
+@@ -135,6 +135,7 @@ class Command(BaseCommand):
+                 if processed:
+                     self.log("Post-processed '%s' as '%s'" %
+                              (original_path, processed_path), level=2)
++                    if original_path not in self.post_processed_files:
+                     self.post_processed_files.append(original_path)
+                 else:
+                     self.log("Skipped post-processing '%s'" % original_path)
+2025-11-26 14:17:50,230 - INFO - Grading answer for django__django-14053...
+2025-11-26 14:17:50,232 - INFO - report: {'django__django-14053': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': [], 'failure': ['post_processing behaves correctly.']}, 'PASS_TO_PASS': {'success': [], 'failure': ['test_hashed_name (staticfiles_tests.test_storage.TestCollectionNoneHashStorage)', 'test_collect_static_files_default_permissions (staticfiles_tests.test_storage.TestStaticFilePermissions)', 'test_collect_static_files_permissions (staticfiles_tests.test_storage.TestStaticFilePermissions)', 'test_collect_static_files_subclass_of_static_storage (staticfiles_tests.test_storage.TestStaticFilePermissions)', 'With storage classes having several file extension patterns, only the', 'test_template_tag_return (staticfiles_tests.test_storage.TestCollectionSimpleStorage)', 'test_template_tag_simple_content (staticfiles_tests.test_storage.TestCollectionSimpleStorage)', 'test_file_change_after_collectstatic (staticfiles_tests.test_storage.TestCollectionHashedFilesCache)', 'test_clear_empties_manifest (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_css_import_case_insensitive (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_import_loop (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'See #18050', 'test_intermediate_files (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_loaded_cache (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_manifest_does_not_exist (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_manifest_does_not_ignore_permission_error (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_manifest_exists (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_missing_entry (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_parse_cache (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_path_ignored_completely (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_path_with_fragment (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_path_with_querystring (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_path_with_querystring_and_fragment (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'post_processing indicates the origin of the error when it fails.', 'test_template_tag_absolute (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'Like test_template_tag_absolute, but for a file in STATIC_ROOT (#26249).', 'test_template_tag_deep_relative (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_template_tag_relative (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_template_tag_return (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_template_tag_simple_content (staticfiles_tests.test_storage.TestCollectionManifestStorage)', 'test_template_tag_url (staticfiles_tests.test_storage.TestCollectionManifestStorage)']}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-14053: resolved: False
+2025-11-26 14:17:50,232 - INFO - Attempting to stop container sweb.eval.django__django-14053.my_evaluation_run...
+2025-11-26 14:18:09,266 - INFO - Attempting to remove container sweb.eval.django__django-14053.my_evaluation_run...
+2025-11-26 14:18:09,441 - INFO - Container sweb.eval.django__django-14053.my_evaluation_run removed.

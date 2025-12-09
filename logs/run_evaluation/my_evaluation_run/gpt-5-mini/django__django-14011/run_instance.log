@@ -1,0 +1,36 @@
+2025-11-26 13:28:48,138 - INFO - Creating container for django__django-14011...
+2025-11-26 13:28:48,366 - INFO - Container for django__django-14011 created: 54ee11da2edf4513feabc61bc08910c583f5b7159ceff807f5142058c9d1aeff
+2025-11-26 13:28:48,896 - INFO - Container for django__django-14011 started: 54ee11da2edf4513feabc61bc08910c583f5b7159ceff807f5142058c9d1aeff
+2025-11-26 13:28:48,897 - INFO - Intermediate patch for django__django-14011 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/django__django-14011/patch.diff, now applying to container...
+2025-11-26 13:28:49,044 - INFO - >>>>> Applied Patch:
+Checking patch django/test/testcases.py...
+Applied patch django/test/testcases.py cleanly.
+
+2025-11-26 13:28:50,360 - INFO - Git diff before:
+diff --git a/django/test/testcases.py b/django/test/testcases.py
+index 92f566b7b0..82ef48e6cc 100644
+--- a/django/test/testcases.py
++++ b/django/test/testcases.py
+@@ -1504,6 +1504,10 @@ class LiveServerThread(threading.Thread):
+             # If binding to port zero, assign the port allocated by the OS.
+             if self.port == 0:
+                 self.port = self.httpd.server_address[1]
++            # Ensure worker threads are not daemonized so shutdown waits for them,
++            # allowing request_finished handlers (like close_old_connections) to run.
++            if hasattr(self.httpd, 'daemon_threads'):
++                self.httpd.daemon_threads = False
+             self.httpd.set_app(handler)
+             self.is_ready.set()
+             self.httpd.serve_forever()
+2025-11-26 13:28:50,360 - INFO - Eval script for django__django-14011 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/django__django-14011/eval.sh; copying to container...
+2025-11-26 13:29:04,749 - INFO - Test runtime: 14.24 seconds
+2025-11-26 13:29:04,750 - INFO - Test output for django__django-14011 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/django__django-14011/test_output.txt
+2025-11-26 13:29:04,829 - INFO - Git diff after:
+
+2025-11-26 13:29:04,829 - INFO - Git diff changed after running eval script
+2025-11-26 13:29:04,829 - INFO - Grading answer for django__django-14011...
+2025-11-26 13:29:04,830 - INFO - report: {'django__django-14011': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': [], 'failure': ['test_live_server_url_is_class_property (servers.tests.LiveServerAddress)', 'Data written to the database by a view can be read.', 'Fixtures are properly loaded and visible to the live server thread.', 'test_check_model_instance_from_subview (servers.tests.LiveServerThreadedTests)', 'test_view_calls_subview (servers.tests.LiveServerThreadedTests)', 'test_404 (servers.tests.LiveServerViews)', 'A HTTP 1.1 server is supposed to support keep-alive. Since our', 'test_environ (servers.tests.LiveServerViews)', 'test_keep_alive_connection_clears_previous_request_data (servers.tests.LiveServerViews)', 'See `test_closes_connection_without_content_length` for details. This', 'test_media_files (servers.tests.LiveServerViews)', 'LiveServerTestCase reports a 404 status code when HTTP client', 'Launched server serves with HTTP 1.1.', 'test_static_files (servers.tests.LiveServerViews)', 'test_view (servers.tests.LiveServerViews)', 'Each LiveServerTestCase binds to a unique port or fails to start a', "LiveServerTestCase.port customizes the server's port."]}, 'PASS_TO_PASS': {'success': ['test_set_up_class (servers.tests.LiveServerTestCaseSetupTest)', 'Contrast to'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-14011: resolved: False
+2025-11-26 13:29:04,831 - INFO - Attempting to stop container sweb.eval.django__django-14011.my_evaluation_run...
+2025-11-26 13:29:20,313 - INFO - Attempting to remove container sweb.eval.django__django-14011.my_evaluation_run...
+2025-11-26 13:29:20,399 - INFO - Container sweb.eval.django__django-14011.my_evaluation_run removed.

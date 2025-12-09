@@ -1,0 +1,23 @@
+diff --git a/requests/structures.py b/requests/structures.py
+index a175913..bc76824 100644
+--- a/requests/structures.py
++++ b/requests/structures.py
+@@ -68,11 +68,15 @@ class CaseInsensitiveDict(collections.MutableMapping):
+             data = {}
+         self.update(data, **kwargs)
+
+-    def __setitem__(self, key, value):
++def __setitem__(self, key, value):
+         # Use the lowercased key for lookups, but store the actual
+-        # key alongside the value.
+-        self._store[key.lower()] = (key, value)
+-
++        # key alongside the value. If a value of None is provided,
++        # treat this as a request to remove the header entirely.
++        if value is None:
++            # Silently ignore if the key does not exist.
++            self._store.pop(key.lower(), None)
++        else:
++            self._store[key.lower()] = (key, value)
+     def __getitem__(self, key):
+         return self._store[key.lower()][1]

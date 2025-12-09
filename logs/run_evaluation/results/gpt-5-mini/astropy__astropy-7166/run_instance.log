@@ -1,0 +1,145 @@
+2025-11-26 11:55:57,773 - INFO - Creating container for astropy__astropy-7166...
+2025-11-26 11:55:57,889 - INFO - Container for astropy__astropy-7166 created: 860cd56f1eddd17f3e066cdbaa5e243fc696953e5f66c0419c82c46351b0d5e0
+2025-11-26 11:55:58,274 - INFO - Container for astropy__astropy-7166 started: 860cd56f1eddd17f3e066cdbaa5e243fc696953e5f66c0419c82c46351b0d5e0
+2025-11-26 11:55:58,275 - INFO - Intermediate patch for astropy__astropy-7166 written to logs/run_evaluation/results/gpt-5-mini/astropy__astropy-7166/patch.diff, now applying to container...
+2025-11-26 11:55:58,444 - INFO - >>>>> Applied Patch:
+Checking patch astropy/utils/misc.py...
+Applied patch astropy/utils/misc.py cleanly.
+
+2025-11-26 11:55:59,050 - INFO - Git diff before:
+diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py
+index de3fb01d1..bbaaf33e2 100644
+--- a/astropy/utils/misc.py
++++ b/astropy/utils/misc.py
+@@ -528,14 +528,51 @@ class InheritDocstrings(type):
+                 not key.startswith('_'))
+
+         for key, val in dct.items():
+-            if (inspect.isfunction(val) and
+-                is_public_member(key) and
+-                val.__doc__ is None):
+-                for base in cls.__mro__[1:]:
+-                    super_method = getattr(base, key, None)
+-                    if super_method is not None:
+-                        val.__doc__ = super_method.__doc__
+-                        break
++            if is_public_member(key) and getattr(val, '__doc__', None) is None:
++                # functions
++                if inspect.isfunction(val):
++                    for base in cls.__mro__[1:]:
++                        super_method = getattr(base, key, None)
++                        if super_method is not None:
++                            val.__doc__ = super_method.__doc__
++                            break
++
++                # properties
++                elif isinstance(val, property):
++                    for base in cls.__mro__[1:]:
++                        super_prop = getattr(base, key, None)
++                        if isinstance(super_prop, property) and super_prop.__doc__:
++                            # Create a new property with the inherited docstring
++                            new_prop = property(val.fget, val.fset, val.fdel, doc=super_prop.__doc__)
++                            setattr(cls, key, new_prop)
++                            break
++
++                # classmethod/staticmethod: try to inherit docstring from the underlying function
++                elif isinstance(val, classmethod):
++                    func = val.__func__
++                    if inspect.isfunction(func):
++                        for base in cls.__mro__[1:]:
++                            super_method = getattr(base, key, None)
++                            if super_method is None:
++                                continue
++                            super_func = getattr(super_method, '__func__', super_method)
++                            doc = getattr(super_func, '__doc__', None)
++                            if doc:
++                                func.__doc__ = doc
++                                break
++
++                elif isinstance(val, staticmethod):
++                    func = val.__func__
++                    if inspect.isfunction(func):
++                        for base in cls.__mro__[1:]:
++                            super_method = getattr(base, key, None)
++                            if super_method is None:
++                                continue
++                            super_func = getattr(super_method, '__func__', super_method)
++                            doc = getattr(super_func, '__doc__', None)
++                            if doc:
++                                func.__doc__ = doc
++                                break
+
+         super().__init__(name, bases, dct)
+2025-11-26 11:55:59,050 - INFO - Eval script for astropy__astropy-7166 written to logs/run_evaluation/results/gpt-5-mini/astropy__astropy-7166/eval.sh; copying to container...
+2025-11-26 11:56:08,017 - INFO - Test runtime: 8.88 seconds
+2025-11-26 11:56:08,017 - INFO - Test output for astropy__astropy-7166 written to logs/run_evaluation/results/gpt-5-mini/astropy__astropy-7166/test_output.txt
+2025-11-26 11:56:08,102 - INFO - Git diff after:
+diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py
+index de3fb01d1..bbaaf33e2 100644
+--- a/astropy/utils/misc.py
++++ b/astropy/utils/misc.py
+@@ -528,14 +528,51 @@ class InheritDocstrings(type):
+                 not key.startswith('_'))
+
+         for key, val in dct.items():
+-            if (inspect.isfunction(val) and
+-                is_public_member(key) and
+-                val.__doc__ is None):
+-                for base in cls.__mro__[1:]:
+-                    super_method = getattr(base, key, None)
+-                    if super_method is not None:
+-                        val.__doc__ = super_method.__doc__
+-                        break
++            if is_public_member(key) and getattr(val, '__doc__', None) is None:
++                # functions
++                if inspect.isfunction(val):
++                    for base in cls.__mro__[1:]:
++                        super_method = getattr(base, key, None)
++                        if super_method is not None:
++                            val.__doc__ = super_method.__doc__
++                            break
++
++                # properties
++                elif isinstance(val, property):
++                    for base in cls.__mro__[1:]:
++                        super_prop = getattr(base, key, None)
++                        if isinstance(super_prop, property) and super_prop.__doc__:
++                            # Create a new property with the inherited docstring
++                            new_prop = property(val.fget, val.fset, val.fdel, doc=super_prop.__doc__)
++                            setattr(cls, key, new_prop)
++                            break
++
++                # classmethod/staticmethod: try to inherit docstring from the underlying function
++                elif isinstance(val, classmethod):
++                    func = val.__func__
++                    if inspect.isfunction(func):
++                        for base in cls.__mro__[1:]:
++                            super_method = getattr(base, key, None)
++                            if super_method is None:
++                                continue
++                            super_func = getattr(super_method, '__func__', super_method)
++                            doc = getattr(super_func, '__doc__', None)
++                            if doc:
++                                func.__doc__ = doc
++                                break
++
++                elif isinstance(val, staticmethod):
++                    func = val.__func__
++                    if inspect.isfunction(func):
++                        for base in cls.__mro__[1:]:
++                            super_method = getattr(base, key, None)
++                            if super_method is None:
++                                continue
++                            super_func = getattr(super_method, '__func__', super_method)
++                            doc = getattr(super_func, '__doc__', None)
++                            if doc:
++                                func.__doc__ = doc
++                                break
+
+         super().__init__(name, bases, dct)
+2025-11-26 11:56:08,103 - INFO - Grading answer for astropy__astropy-7166...
+2025-11-26 11:56:08,104 - INFO - report: {'astropy__astropy-7166': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['astropy/utils/tests/test_misc.py::test_inherit_docstrings'], 'failure': []}, 'PASS_TO_PASS': {'success': ['astropy/utils/tests/test_misc.py::test_isiterable', 'astropy/utils/tests/test_misc.py::test_signal_number_to_name_no_failure', 'astropy/utils/tests/test_misc.py::test_skip_hidden', 'astropy/utils/tests/test_misc.py::test_JsonCustomEncoder', 'astropy/utils/tests/test_misc.py::test_check_broadcast', 'astropy/utils/tests/test_misc.py::test_dtype_bytes_or_chars'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for astropy__astropy-7166: resolved: True
+2025-11-26 11:56:08,105 - INFO - Attempting to stop container sweb.eval.astropy__astropy-7166.results...
+2025-11-26 11:56:26,917 - INFO - Attempting to remove container sweb.eval.astropy__astropy-7166.results...
+2025-11-26 11:56:27,010 - INFO - Container sweb.eval.astropy__astropy-7166.results removed.

@@ -1,0 +1,23 @@
+diff --git a/src/_pytest/skipping.py b/src/_pytest/skipping.py
+index 335e10996..8f38f7834 100644
+--- a/src/_pytest/skipping.py
++++ b/src/_pytest/skipping.py
+@@ -248,6 +248,9 @@ def pytest_runtest_setup(item: Item) -> None:
+ def pytest_runtest_call(item: Item) -> Generator[None, None, None]:
+     xfailed = item._store.get(xfailed_key, None)
+     if xfailed is None:
++        # Re-evaluate here so dynamically added xfail markers during the test
++        # (for example via request.node.add_marker(pytest.mark.xfail(...)))
++        # are taken into account.
+         item._store[xfailed_key] = xfailed = evaluate_xfail_marks(item)
+
+     if not item.config.option.runxfail:
+@@ -256,6 +259,8 @@ def pytest_runtest_call(item: Item) -> Generator[None, None, None]:
+
+     yield
+
++    yield
++
+
+ @hookimpl(hookwrapper=True)
+ def pytest_runtest_makereport(item: Item, call: CallInfo[None]):

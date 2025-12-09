@@ -1,0 +1,53 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 40ac1d3162..a597e75cd9 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -600,10 +600,21 @@ class ChoiceWidget(Widget):
+             groups.append((group_name, subgroup, index))
+
+             for subvalue, sublabel in choices:
+-                selected = (
+-                    str(subvalue) in value and
+-                    (not has_selected or self.allow_multiple_selected)
+-                )
++                # By default, compare the stringified option value against the
++                # formatted incoming value(s). However, for radio inputs we
++                # don't want to mark the "empty" choice ('' / None) as the
++                # selected option just because the widget's formatted value is
++                # [''] (which is the case for an uninitialized field). Radio
++                # inputs have an inherent unselected state and a checked blank
++                # radio looks like a real choice. Preserve the original logic
++                # for all other cases.
++                if self.input_type == 'radio' and (subvalue is None or str(subvalue) == '') and value == ['']:
++                    selected = False
++                else:
++                    selected = (
++                        str(subvalue) in value and
++                        (not has_selected or self.allow_multiple_selected)
++                    )
+                 has_selected |= selected
+                 subgroup.append(self.create_option(
+                     name, subvalue, sublabel, selected, index,
+diff --git a/tests/model_forms/test_modelchoicefield.py b/tests/model_forms/test_modelchoicefield.py
+index 4a2ef30b90..4e1a3803a5 100644
+--- a/tests/model_forms/test_modelchoicefield.py
++++ b/tests/model_forms/test_modelchoicefield.py
+@@ -353,3 +353,18 @@ class ModelChoiceFieldTests(TestCase):
+         )
+         with self.assertNumQueries(2):
+             template.render(Context({'form': CategoriesForm()}))
++
++
++    def test_radios_dont_select_empty_choice_for_required_fields(self):
++        """
++        RadioSelect should not render the empty choice as checked for a
++        required ModelChoiceField (the model's field.blank is False).
++        """
++        class ModelChoiceForm(forms.Form):
++            category = forms.ModelChoiceField(Category.objects.all(), widget=forms.RadioSelect)
++
++        form = ModelChoiceForm()
++        rendered = form.as_table()  # render the whole form to HTML
++        # The empty choice should not be rendered as checked (no checked attribute
++        # on the input with value="").
++        assert 'value="" checked' not in rendered

@@ -1,0 +1,15 @@
+diff --git a/django/test/testcases.py b/django/test/testcases.py
+index 92f566b7b0..82ef48e6cc 100644
+--- a/django/test/testcases.py
++++ b/django/test/testcases.py
+@@ -1504,6 +1504,10 @@ class LiveServerThread(threading.Thread):
+             # If binding to port zero, assign the port allocated by the OS.
+             if self.port == 0:
+                 self.port = self.httpd.server_address[1]
++            # Ensure worker threads are not daemonized so shutdown waits for them,
++            # allowing request_finished handlers (like close_old_connections) to run.
++            if hasattr(self.httpd, 'daemon_threads'):
++                self.httpd.daemon_threads = False
+             self.httpd.set_app(handler)
+             self.is_ready.set()
+             self.httpd.serve_forever()

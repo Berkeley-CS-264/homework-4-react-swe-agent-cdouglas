@@ -1,0 +1,46 @@
+2025-11-26 12:43:08,267 - INFO - Creating container for django__django-14011...
+2025-11-26 12:43:08,707 - INFO - Container for django__django-14011 created: 138a4fcb9aeba84104d9311aaf00018638ba7c2f7267b37ad87d5a82cec75262
+2025-11-26 12:43:10,037 - INFO - Container for django__django-14011 started: 138a4fcb9aeba84104d9311aaf00018638ba7c2f7267b37ad87d5a82cec75262
+2025-11-26 12:43:10,039 - INFO - Intermediate patch for django__django-14011 written to logs/run_evaluation/results/gpt-5-mini/django__django-14011/patch.diff, now applying to container...
+2025-11-26 12:43:10,366 - INFO - >>>>> Applied Patch:
+Checking patch django/test/testcases.py...
+Applied patch django/test/testcases.py cleanly.
+
+2025-11-26 12:43:11,831 - INFO - Git diff before:
+diff --git a/django/test/testcases.py b/django/test/testcases.py
+index 92f566b7b0..0b5b4431b0 100644
+--- a/django/test/testcases.py
++++ b/django/test/testcases.py
+@@ -1514,11 +1514,19 @@ class LiveServerThread(threading.Thread):
+             connections.close_all()
+
+     def _create_server(self):
+-        return self.server_class(
++        server = self.server_class(
+             (self.host, self.port),
+             QuietWSGIRequestHandler,
+             allow_reuse_address=False,
+         )
++        # Ensure request threads are not daemon threads so that server_close()
++        # waits for worker threads to finish before the live server thread
++        # closes database connections. ThreadingMixIn ignores daemon threads
++        # when joining, which can cause a race when connections are closed
++        # while request threads are still running.
++        if hasattr(server, 'daemon_threads'):
++            server.daemon_threads = False
++        return server
+
+     def terminate(self):
+         if hasattr(self, 'httpd'):
+2025-11-26 12:43:11,832 - INFO - Eval script for django__django-14011 written to logs/run_evaluation/results/gpt-5-mini/django__django-14011/eval.sh; copying to container...
+2025-11-26 12:43:30,192 - INFO - Test runtime: 18.24 seconds
+2025-11-26 12:43:30,193 - INFO - Test output for django__django-14011 written to logs/run_evaluation/results/gpt-5-mini/django__django-14011/test_output.txt
+2025-11-26 12:43:30,306 - INFO - Git diff after:
+
+2025-11-26 12:43:30,307 - INFO - Git diff changed after running eval script
+2025-11-26 12:43:30,307 - INFO - Grading answer for django__django-14011...
+2025-11-26 12:43:30,308 - INFO - report: {'django__django-14011': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': [], 'failure': ['test_live_server_url_is_class_property (servers.tests.LiveServerAddress)', 'Data written to the database by a view can be read.', 'Fixtures are properly loaded and visible to the live server thread.', 'test_check_model_instance_from_subview (servers.tests.LiveServerThreadedTests)', 'test_view_calls_subview (servers.tests.LiveServerThreadedTests)', 'test_404 (servers.tests.LiveServerViews)', 'A HTTP 1.1 server is supposed to support keep-alive. Since our', 'test_environ (servers.tests.LiveServerViews)', 'test_keep_alive_connection_clears_previous_request_data (servers.tests.LiveServerViews)', 'See `test_closes_connection_without_content_length` for details. This', 'test_media_files (servers.tests.LiveServerViews)', 'LiveServerTestCase reports a 404 status code when HTTP client', 'Launched server serves with HTTP 1.1.', 'test_static_files (servers.tests.LiveServerViews)', 'test_view (servers.tests.LiveServerViews)', 'Each LiveServerTestCase binds to a unique port or fails to start a', "LiveServerTestCase.port customizes the server's port."]}, 'PASS_TO_PASS': {'success': ['test_set_up_class (servers.tests.LiveServerTestCaseSetupTest)', 'Contrast to'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for django__django-14011: resolved: False
+2025-11-26 12:43:30,309 - INFO - Attempting to stop container sweb.eval.django__django-14011.results...
+2025-11-26 12:43:45,835 - INFO - Attempting to remove container sweb.eval.django__django-14011.results...
+2025-11-26 12:43:45,923 - INFO - Container sweb.eval.django__django-14011.results removed.

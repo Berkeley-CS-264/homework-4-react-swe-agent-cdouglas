@@ -1,0 +1,47 @@
+diff --git a/requests/models.py b/requests/models.py
+index 9c624d3..fedf692 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -80,7 +80,12 @@ class RequestEncodingMixin(object):
+         if parameters are supplied as a dict.
+         """
+
+-        if isinstance(data, (str, bytes)):
++        # If the data is already bytes, return it unchanged. Trying to coerce
++        # arbitrary bytes to native string (via to_native_string) can raise
++        # UnicodeDecodeError for non-ASCII payloads (e.g. UTF-8 bytes).
++        if isinstance(data, bytes):
++            return data
++        if isinstance(data, str):
+             return to_native_string(data)
+         elif hasattr(data, 'read'):
+             return data
+diff --git a/requests/utils.py b/requests/utils.py
+index 132cd2b..18e652e 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -697,7 +697,23 @@ def to_native_string(string, encoding='ascii'):
+         if is_py2:
+             out = string.encode(encoding)
+         else:
+-            out = string.decode(encoding)
++            # In Python 3 we may be given a bytes object. Try to decode using
++            # the provided encoding first (default: ascii). If that fails due
++            # to a UnicodeDecodeError, fall back to utf-8. If decoding still
++            # fails (or the object doesn't support decode), coerce to the
++            # native string using errors='replace' to ensure a usable result.
++            try:
++                out = string.decode(encoding)
++            except (AttributeError, UnicodeDecodeError):
++                try:
++                    out = string.decode('utf-8')
++                except Exception:
++                    # Last resort: try a lossy decode with the original encoding.
++                    try:
++                        out = builtin_str(string, encoding, errors='replace')
++                    except Exception:
++                        # Fallback: coerce with str()
++                        out = str(string)
+
+     return out
+

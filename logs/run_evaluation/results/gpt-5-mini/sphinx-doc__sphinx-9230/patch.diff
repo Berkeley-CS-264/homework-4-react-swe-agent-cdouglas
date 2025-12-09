@@ -1,0 +1,80 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index d8cb75a5f..4daffad17 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -43,9 +43,9 @@ _enumerated_list_regex = re.compile(
+     r'(\d+|#|[ivxlcdm]+|[IVXLCDM]+|[a-zA-Z])'
+     r'(?(paren)\)|\.)(\s+\S|\s*$)')
+ _token_regex = re.compile(
+-    r"(,\sor\s|\sor\s|\sof\s|:\s|\sto\s|,\sand\s|\sand\s|,\s"
+-    r"|[{]|[}]"
+-    r'|"(?:\\"|[^"])*"'
++    r"(,\\sor\\s|\\sor\\s|\\sof\\s|:\\s|\\sto\\s|,\\sand\\s|\\sand\\s|,\\s"
++    r"|\(|\)|\{|\}|\[|\]"
++    r'|"(?:\\\"|[^"])*"'
+     r"|'(?:\\'|[^'])*')"
+ )
+ _default_regex = re.compile(
+@@ -877,8 +877,12 @@ def _recombine_set_tokens(tokens: List[str]) -> List[str]:
+     keywords = ("optional", "default")
+
+     def takewhile_set(tokens):
+-        open_braces = 0
++        # Recombine tokens inside any bracketed expression: (), [], {}.
++        stack = []
+         previous_token = None
++        opening = {"(": ")", "[": "]", "{": "}"}
++        closing = {")": "(", "]": "[", "}": "{"}
++
+         while True:
+             try:
+                 token = tokens.popleft()
+@@ -886,6 +890,7 @@ def _recombine_set_tokens(tokens: List[str]) -> List[str]:
+                 break
+
+             if token == ", ":
++                # Keep the comma delimiter inside bracketed expressions
+                 previous_token = token
+                 continue
+
+@@ -893,6 +898,8 @@ def _recombine_set_tokens(tokens: List[str]) -> List[str]:
+                 continue
+
+             if token in keywords:
++                # push back the keyword for outer processing; also restore
++                # a saved previous comma if any.
+                 tokens.appendleft(token)
+                 if previous_token is not None:
+                     tokens.appendleft(previous_token)
+@@ -902,14 +909,26 @@ def _recombine_set_tokens(tokens: List[str]) -> List[str]:
+                 yield previous_token
+                 previous_token = None
+
+-            if token == "{":
+-                open_braces += 1
+-            elif token == "}":
+-                open_braces -= 1
++            # Track bracket nesting
++            if token in opening:
++                stack.append(token)
++            elif token in closing:
++                if stack:
++                    # only pop if matching or just pop to avoid stuckness
++                    if stack[-1] == closing[token]:
++                        stack.pop()
++                    else:
++                        stack.pop()
++                else:
++                    # unmatched closing; yield and stop
++                    yield token
++                    break
+
+             yield token
+
+-            if open_braces == 0:
++            # If we've closed the initially opened bracketed expression,
++            # stop collecting.
++            if not stack:
+                 break
+
+     def combine_set(tokens):

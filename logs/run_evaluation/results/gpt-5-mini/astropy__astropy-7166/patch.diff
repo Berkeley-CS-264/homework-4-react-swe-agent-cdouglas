@@ -1,0 +1,64 @@
+diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py
+index de3fb01d1..bbaaf33e2 100644
+--- a/astropy/utils/misc.py
++++ b/astropy/utils/misc.py
+@@ -528,14 +528,51 @@ class InheritDocstrings(type):
+                 not key.startswith('_'))
+
+         for key, val in dct.items():
+-            if (inspect.isfunction(val) and
+-                is_public_member(key) and
+-                val.__doc__ is None):
+-                for base in cls.__mro__[1:]:
+-                    super_method = getattr(base, key, None)
+-                    if super_method is not None:
+-                        val.__doc__ = super_method.__doc__
+-                        break
++            if is_public_member(key) and getattr(val, '__doc__', None) is None:
++                # functions
++                if inspect.isfunction(val):
++                    for base in cls.__mro__[1:]:
++                        super_method = getattr(base, key, None)
++                        if super_method is not None:
++                            val.__doc__ = super_method.__doc__
++                            break
++
++                # properties
++                elif isinstance(val, property):
++                    for base in cls.__mro__[1:]:
++                        super_prop = getattr(base, key, None)
++                        if isinstance(super_prop, property) and super_prop.__doc__:
++                            # Create a new property with the inherited docstring
++                            new_prop = property(val.fget, val.fset, val.fdel, doc=super_prop.__doc__)
++                            setattr(cls, key, new_prop)
++                            break
++
++                # classmethod/staticmethod: try to inherit docstring from the underlying function
++                elif isinstance(val, classmethod):
++                    func = val.__func__
++                    if inspect.isfunction(func):
++                        for base in cls.__mro__[1:]:
++                            super_method = getattr(base, key, None)
++                            if super_method is None:
++                                continue
++                            super_func = getattr(super_method, '__func__', super_method)
++                            doc = getattr(super_func, '__doc__', None)
++                            if doc:
++                                func.__doc__ = doc
++                                break
++
++                elif isinstance(val, staticmethod):
++                    func = val.__func__
++                    if inspect.isfunction(func):
++                        for base in cls.__mro__[1:]:
++                            super_method = getattr(base, key, None)
++                            if super_method is None:
++                                continue
++                            super_func = getattr(super_method, '__func__', super_method)
++                            doc = getattr(super_func, '__doc__', None)
++                            if doc:
++                                func.__doc__ = doc
++                                break
+
+         super().__init__(name, bases, dct)
+

@@ -1,0 +1,18 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 40ac1d3162..939f4302d6 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -661,6 +661,13 @@ class ChoiceWidget(Widget):
+         """Return selected values as a list."""
+         if value is None and self.allow_multiple_selected:
+             return []
++        # For radio widgets, don't select the empty choice (''/None) implicitly
++        # when the widget is required. Radio widgets already have an inherent
++        # unfilled state, and selecting the blank choice makes it look like a
++        # valid option.
++        if (value is None or value == '') and not self.allow_multiple_selected and \
++                getattr(self, 'input_type', None) == 'radio' and getattr(self, 'is_required', False):
++            return []
+         if not isinstance(value, (tuple, list)):
+             value = [value]
+         return [str(v) if v is not None else '' for v in value]

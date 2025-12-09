@@ -1,0 +1,114 @@
+2025-11-26 14:17:35,684 - INFO - Creating container for sympy__sympy-17655...
+2025-11-26 14:17:35,886 - INFO - Container for sympy__sympy-17655 created: 6c758798ebbf3a306c77e61368306c3e53fc77c63a59da7b2484432d3a25a67a
+2025-11-26 14:17:37,411 - INFO - Container for sympy__sympy-17655 started: 6c758798ebbf3a306c77e61368306c3e53fc77c63a59da7b2484432d3a25a67a
+2025-11-26 14:17:37,412 - INFO - Intermediate patch for sympy__sympy-17655 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/sympy__sympy-17655/patch.diff, now applying to container...
+2025-11-26 14:17:37,662 - INFO - Failed to apply patch to container: git apply --verbose
+2025-11-26 14:17:37,759 - INFO - Failed to apply patch to container: git apply --verbose --reject
+2025-11-26 14:17:37,980 - INFO - >>>>> Applied Patch:
+patching file sympy/geometry/point.py
+patch unexpectedly ends in middle of line
+Hunk #2 succeeded at 295 with fuzz 1.
+
+2025-11-26 14:17:38,604 - INFO - Git diff before:
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..6da7dc15fe 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -216,11 +216,29 @@ def __add__(self, other):
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
+-            raise GeometryError("Don't know how to add {} and a Point object".format(other))
++            # Handle expressions like scalar * Point (e.g., 2.0*Point(1, 1))
++            try:
++                # If the expression is a Mul-like Expr that contains a Point factor,
++                # extract the Point and the scalar and convert scalar*Point to a Point.
++                if isinstance(other, Expr) and getattr(other, 'args', None):
++                    point_factors = [a for a in other.args if isinstance(a, Point)]
++                    if point_factors:
++                        point_factor = point_factors[0]
++                        scalar = S.One
++                        for a in other.args:
++                            if a is not point_factor:
++                                scalar = scalar * a
++                        other = point_factor * scalar
++                        s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
++                    else:
++                        raise
++                else:
++                    raise
++            except Exception:
++                raise GeometryError("Don't know how to add {} and a Point object".format(other))
+
+         coords = [simplify(a + b) for a, b in zip(s, o)]
+         return Point(coords, evaluate=False)
+-
+     def __contains__(self, item):
+         return item in self.args
+
+@@ -277,6 +295,9 @@ def __mul__(self, factor):
+         factor = sympify(factor)
+         coords = [simplify(x*factor) for x in self.args]
+         return Point(coords, evaluate=False)
++    def __rmul__(self, factor):
++        """Right-hand multiplication so that `factor * Point` behaves the same as `Point * factor`."""
++        return self.__mul__(factor)
+
+     def __neg__(self):
+         """Negate the point."""
+2025-11-26 14:17:38,605 - INFO - Eval script for sympy__sympy-17655 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/sympy__sympy-17655/eval.sh; copying to container...
+2025-11-26 14:18:13,975 - INFO - Test runtime: 35.29 seconds
+2025-11-26 14:18:13,975 - INFO - Test output for sympy__sympy-17655 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/sympy__sympy-17655/test_output.txt
+2025-11-26 14:18:14,036 - INFO - Git diff after:
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..6da7dc15fe 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -216,11 +216,29 @@ def __add__(self, other):
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
+-            raise GeometryError("Don't know how to add {} and a Point object".format(other))
++            # Handle expressions like scalar * Point (e.g., 2.0*Point(1, 1))
++            try:
++                # If the expression is a Mul-like Expr that contains a Point factor,
++                # extract the Point and the scalar and convert scalar*Point to a Point.
++                if isinstance(other, Expr) and getattr(other, 'args', None):
++                    point_factors = [a for a in other.args if isinstance(a, Point)]
++                    if point_factors:
++                        point_factor = point_factors[0]
++                        scalar = S.One
++                        for a in other.args:
++                            if a is not point_factor:
++                                scalar = scalar * a
++                        other = point_factor * scalar
++                        s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
++                    else:
++                        raise
++                else:
++                    raise
++            except Exception:
++                raise GeometryError("Don't know how to add {} and a Point object".format(other))
+
+         coords = [simplify(a + b) for a, b in zip(s, o)]
+         return Point(coords, evaluate=False)
+-
+     def __contains__(self, item):
+         return item in self.args
+
+@@ -277,6 +295,9 @@ def __mul__(self, factor):
+         factor = sympify(factor)
+         coords = [simplify(x*factor) for x in self.args]
+         return Point(coords, evaluate=False)
++    def __rmul__(self, factor):
++        """Right-hand multiplication so that `factor * Point` behaves the same as `Point * factor`."""
++        return self.__mul__(factor)
+
+     def __neg__(self):
+         """Negate the point."""
+2025-11-26 14:18:14,037 - INFO - Grading answer for sympy__sympy-17655...
+2025-11-26 14:18:14,037 - INFO - report: {'sympy__sympy-17655': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['test_point', 'test_point3D'], 'failure': []}, 'PASS_TO_PASS': {'success': ['test_Point2D', 'test_issue_9214', 'test_issue_11617', 'test_transform', 'test_concyclic_doctest_bug', 'test_arguments', 'test_unit', 'test_dot', 'test__normalize_dimension'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for sympy__sympy-17655: resolved: True
+2025-11-26 14:18:14,037 - INFO - Attempting to stop container sweb.eval.sympy__sympy-17655.my_evaluation_run...
+2025-11-26 14:18:32,742 - INFO - Attempting to remove container sweb.eval.sympy__sympy-17655.my_evaluation_run...
+2025-11-26 14:18:32,822 - INFO - Container sweb.eval.sympy__sympy-17655.my_evaluation_run removed.

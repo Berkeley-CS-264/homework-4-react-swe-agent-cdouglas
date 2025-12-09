@@ -1,0 +1,281 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index d8cb75a5f..f0d5daca9 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -282,18 +282,273 @@ class GoogleDocstring:
+         _descs = self.__class__(_descs, self._config).lines()
+         return _name, _type, _descs
+
+-    def _consume_fields(self, parse_type: bool = True, prefer_type: bool = False,
++def _consume_fields(self, parse_type: bool = True, prefer_type: bool = False,
+                         multiple: bool = False) -> List[Tuple[str, str, List[str]]]:
+         self._consume_empty()
+         fields = []
+         while not self._is_section_break():
+             _name, _type, _desc = self._consume_field(parse_type, prefer_type)
+             if multiple and _name:
+-                for name in _name.split(","):
+-                    fields.append((name.strip(), _type, _desc))
++                names = []
++                buf = []
++                depth = 0
++                for ch in _name:
++                    if ch in '([{':
++                        depth += 1
++                        buf.append(ch)
++                    elif ch in ')]}':
++                        depth = max(depth - 1, 0)
++                        buf.append(ch)
++                    elif ch == ',' and depth == 0:
++                        part = ''.join(buf).strip()
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc,))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                    if part:
++                        names.append(part)
++                if not names:
++                    names = [_name]
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++                for name in names:
++                    fields.append((name, _type, _desc))
++            elif _name or _type or _desc:
++                fields.append((_name, _type, _desc,))
++        return fields
++----END_FUNCTION_CALL
++                    elif ch == ',' and depth == 0:
++                        part = ''.join(buf).strip()
++                        if part:
++                            names.append(part)
++                        buf = []
++                    else:
++                        buf.append(ch)
++                if buf:
++                    part = ''.join(buf).strip()
++                    if part:
++                        names.append(part)
++
++                for name in names:
++                    fields.append((name, _type, _desc))
+             elif _name or _type or _desc:
+                 fields.append((_name, _type, _desc,))
+         return fields
++----END_FUNCTION_CALL
+
+     def _consume_inline_attribute(self) -> Tuple[str, List[str]]:
+         line = next(self._line_iter)

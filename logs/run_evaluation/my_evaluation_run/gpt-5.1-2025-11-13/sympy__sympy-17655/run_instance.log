@@ -1,0 +1,76 @@
+2025-12-09 13:50:59,581 - INFO - Creating container for sympy__sympy-17655...
+2025-12-09 13:50:59,668 - INFO - Container for sympy__sympy-17655 created: eeb3cb93e6eb152459d1b17b8365abf41b2c2c94fcf03986fe78192104d267b0
+2025-12-09 13:50:59,972 - INFO - Container for sympy__sympy-17655 started: eeb3cb93e6eb152459d1b17b8365abf41b2c2c94fcf03986fe78192104d267b0
+2025-12-09 13:50:59,973 - INFO - Intermediate patch for sympy__sympy-17655 written to logs/run_evaluation/my_evaluation_run/gpt-5.1-2025-11-13/sympy__sympy-17655/patch.diff, now applying to container...
+2025-12-09 13:51:00,146 - INFO - Failed to apply patch to container: git apply --verbose
+2025-12-09 13:51:00,222 - INFO - Failed to apply patch to container: git apply --verbose --reject
+2025-12-09 13:51:00,306 - INFO - >>>>> Applied Patch:
+patching file sympy/geometry/point.py
+patch unexpectedly ends in middle of line
+Hunk #1 succeeded at 213 with fuzz 1.
+
+2025-12-09 13:51:01,332 - INFO - Git diff before:
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..c0ca7af3b6 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,13 +213,21 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+
+         """
+-        try:
++try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
++            # Handle scalar * Point expressions like 2*Point(1, 1)
++            from sympy.core.mul import Mul
++            if isinstance(other, Mul):
++                pts = [arg for arg in other.args if isinstance(arg, Point)]
++                if len(pts) == 1:
++                    factor = other / pts[0]
++                    return self + pts[0]*factor
+             raise GeometryError("Don't know how to add {} and a Point object".format(other))
+
+         coords = [simplify(a + b) for a, b in zip(s, o)]
+         return Point(coords, evaluate=False)
++----END_FUNCTION_CALL
+
+     def __contains__(self, item):
+         return item in self.args
+2025-12-09 13:51:01,332 - INFO - Eval script for sympy__sympy-17655 written to logs/run_evaluation/my_evaluation_run/gpt-5.1-2025-11-13/sympy__sympy-17655/eval.sh; copying to container...
+2025-12-09 13:51:06,483 - INFO - Test runtime: 5.06 seconds
+2025-12-09 13:51:06,483 - INFO - Test output for sympy__sympy-17655 written to logs/run_evaluation/my_evaluation_run/gpt-5.1-2025-11-13/sympy__sympy-17655/test_output.txt
+2025-12-09 13:51:06,586 - INFO - Git diff after:
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..c0ca7af3b6 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,13 +213,21 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+
+         """
+-        try:
++try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
++            # Handle scalar * Point expressions like 2*Point(1, 1)
++            from sympy.core.mul import Mul
++            if isinstance(other, Mul):
++                pts = [arg for arg in other.args if isinstance(arg, Point)]
++                if len(pts) == 1:
++                    factor = other / pts[0]
++                    return self + pts[0]*factor
+             raise GeometryError("Don't know how to add {} and a Point object".format(other))
+
+         coords = [simplify(a + b) for a, b in zip(s, o)]
+         return Point(coords, evaluate=False)
++----END_FUNCTION_CALL
+
+     def __contains__(self, item):
+         return item in self.args
+2025-12-09 13:51:06,586 - INFO - Grading answer for sympy__sympy-17655...
+2025-12-09 13:51:06,588 - INFO - report: {'sympy__sympy-17655': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': False, 'tests_status': {'FAIL_TO_PASS': {'success': [], 'failure': ['test_point', 'test_point3D']}, 'PASS_TO_PASS': {'success': [], 'failure': ['test_Point2D', 'test_issue_9214', 'test_issue_11617', 'test_transform', 'test_concyclic_doctest_bug', 'test_arguments', 'test_unit', 'test_dot', 'test__normalize_dimension']}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for sympy__sympy-17655: resolved: False
+2025-12-09 13:51:06,588 - INFO - Attempting to stop container sweb.eval.sympy__sympy-17655.my_evaluation_run...
+2025-12-09 13:51:24,748 - INFO - Attempting to remove container sweb.eval.sympy__sympy-17655.my_evaluation_run...
+2025-12-09 13:51:24,826 - INFO - Container sweb.eval.sympy__sympy-17655.my_evaluation_run removed.

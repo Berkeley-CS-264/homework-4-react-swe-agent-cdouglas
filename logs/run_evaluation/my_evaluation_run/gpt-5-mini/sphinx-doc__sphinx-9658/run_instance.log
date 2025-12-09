@@ -1,0 +1,69 @@
+2025-11-26 13:29:37,266 - INFO - Creating container for sphinx-doc__sphinx-9658...
+2025-11-26 13:29:37,377 - INFO - Container for sphinx-doc__sphinx-9658 created: a1d6d7e459b7a9208c492ae431bc50b965d920d9e0689e7242134554afa71e7a
+2025-11-26 13:29:37,833 - INFO - Container for sphinx-doc__sphinx-9658 started: a1d6d7e459b7a9208c492ae431bc50b965d920d9e0689e7242134554afa71e7a
+2025-11-26 13:29:37,833 - INFO - Intermediate patch for sphinx-doc__sphinx-9658 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/sphinx-doc__sphinx-9658/patch.diff, now applying to container...
+2025-11-26 13:29:37,982 - INFO - >>>>> Applied Patch:
+Checking patch sphinx/util/typing.py...
+Applied patch sphinx/util/typing.py cleanly.
+
+2025-11-26 13:29:38,365 - INFO - Git diff before:
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 87707d48f..080b5393d 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -115,6 +115,12 @@ def restify(cls: Optional[Type]) -> str:
+             return '...'
+         elif isinstance(cls, str):
+             return cls
++        # If a mocked object provides a __display_name__, prefer that.
++        # This avoids empty __qualname__ values (seen in mocked classes)
++        # producing outputs like "torch.nn." instead of "torch.nn.Module".
++        display = getattr(cls, '__display_name__', None)
++        if isinstance(display, str) and display:
++            return ':py:class:`%s`' % display
+         elif cls in INVALID_BUILTIN_CLASSES:
+             return ':py:class:`%s`' % INVALID_BUILTIN_CLASSES[cls]
+         elif inspect.isNewType(cls):
+@@ -145,6 +151,7 @@ def restify(cls: Optional[Type]) -> str:
+                 return _restify_py36(cls)
+     except (AttributeError, TypeError):
+         return repr(cls)
++        return repr(cls)
+
+
+ def _restify_py37(cls: Optional[Type]) -> str:
+2025-11-26 13:29:38,366 - INFO - Eval script for sphinx-doc__sphinx-9658 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/sphinx-doc__sphinx-9658/eval.sh; copying to container...
+2025-11-26 13:29:44,059 - INFO - Test runtime: 5.53 seconds
+2025-11-26 13:29:44,059 - INFO - Test output for sphinx-doc__sphinx-9658 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/sphinx-doc__sphinx-9658/test_output.txt
+2025-11-26 13:29:44,124 - INFO - Git diff after:
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 87707d48f..080b5393d 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -115,6 +115,12 @@ def restify(cls: Optional[Type]) -> str:
+             return '...'
+         elif isinstance(cls, str):
+             return cls
++        # If a mocked object provides a __display_name__, prefer that.
++        # This avoids empty __qualname__ values (seen in mocked classes)
++        # producing outputs like "torch.nn." instead of "torch.nn.Module".
++        display = getattr(cls, '__display_name__', None)
++        if isinstance(display, str) and display:
++            return ':py:class:`%s`' % display
+         elif cls in INVALID_BUILTIN_CLASSES:
+             return ':py:class:`%s`' % INVALID_BUILTIN_CLASSES[cls]
+         elif inspect.isNewType(cls):
+@@ -145,6 +151,7 @@ def restify(cls: Optional[Type]) -> str:
+                 return _restify_py36(cls)
+     except (AttributeError, TypeError):
+         return repr(cls)
++        return repr(cls)
+
+
+ def _restify_py37(cls: Optional[Type]) -> str:
+2025-11-26 13:29:44,124 - INFO - Grading answer for sphinx-doc__sphinx-9658...
+2025-11-26 13:29:44,125 - INFO - report: {'sphinx-doc__sphinx-9658': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['tests/test_util_typing.py::test_restify_mock'], 'failure': []}, 'PASS_TO_PASS': {'success': ['tests/test_util_typing.py::test_restify', 'tests/test_util_typing.py::test_restify_type_hints_containers', 'tests/test_util_typing.py::test_restify_type_hints_Callable', 'tests/test_util_typing.py::test_restify_type_hints_Union', 'tests/test_util_typing.py::test_restify_type_hints_typevars', 'tests/test_util_typing.py::test_restify_type_hints_custom_class', 'tests/test_util_typing.py::test_restify_type_hints_alias', 'tests/test_util_typing.py::test_restify_type_ForwardRef', 'tests/test_util_typing.py::test_restify_type_Literal', 'tests/test_util_typing.py::test_restify_pep_585', 'tests/test_util_typing.py::test_restify_broken_type_hints', 'tests/test_util_typing.py::test_stringify', 'tests/test_util_typing.py::test_stringify_type_hints_containers', 'tests/test_util_typing.py::test_stringify_type_hints_pep_585', 'tests/test_util_typing.py::test_stringify_Annotated', 'tests/test_util_typing.py::test_stringify_type_hints_string', 'tests/test_util_typing.py::test_stringify_type_hints_Callable', 'tests/test_util_typing.py::test_stringify_type_hints_Union', 'tests/test_util_typing.py::test_stringify_type_hints_typevars', 'tests/test_util_typing.py::test_stringify_type_hints_custom_class', 'tests/test_util_typing.py::test_stringify_type_hints_alias', 'tests/test_util_typing.py::test_stringify_type_Literal', 'tests/test_util_typing.py::test_stringify_broken_type_hints', 'tests/test_util_typing.py::test_stringify_mock'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for sphinx-doc__sphinx-9658: resolved: True
+2025-11-26 13:29:44,126 - INFO - Attempting to stop container sweb.eval.sphinx-doc__sphinx-9658.my_evaluation_run...
+2025-11-26 13:29:59,530 - INFO - Attempting to remove container sweb.eval.sphinx-doc__sphinx-9658.my_evaluation_run...
+2025-11-26 13:29:59,592 - INFO - Container sweb.eval.sphinx-doc__sphinx-9658.my_evaluation_run removed.

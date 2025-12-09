@@ -1,0 +1,179 @@
+2025-11-26 13:28:48,129 - INFO - Creating container for astropy__astropy-7166...
+2025-11-26 13:28:48,404 - INFO - Container for astropy__astropy-7166 created: bdc04cf42bec25737694967700fb6140cd9c6f67237e551cd89f654383af9839
+2025-11-26 13:28:49,385 - INFO - Container for astropy__astropy-7166 started: bdc04cf42bec25737694967700fb6140cd9c6f67237e551cd89f654383af9839
+2025-11-26 13:28:49,385 - INFO - Intermediate patch for astropy__astropy-7166 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/astropy__astropy-7166/patch.diff, now applying to container...
+2025-11-26 13:28:49,547 - INFO - >>>>> Applied Patch:
+Checking patch astropy/utils/misc.py...
+Applied patch astropy/utils/misc.py cleanly.
+
+2025-11-26 13:28:50,172 - INFO - Git diff before:
+diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py
+index de3fb01d1..c6585e0e8 100644
+--- a/astropy/utils/misc.py
++++ b/astropy/utils/misc.py
+@@ -528,14 +528,68 @@ class InheritDocstrings(type):
+                 not key.startswith('_'))
+
+         for key, val in dct.items():
+-            if (inspect.isfunction(val) and
+-                is_public_member(key) and
+-                val.__doc__ is None):
+-                for base in cls.__mro__[1:]:
+-                    super_method = getattr(base, key, None)
+-                    if super_method is not None:
+-                        val.__doc__ = super_method.__doc__
+-                        break
++            if not is_public_member(key):
++                continue
++
++            # Helper to extract a docstring from an object that might be a
++            # function, classmethod, staticmethod, or property.
++            def _get_doc_from_obj(obj):
++                if obj is None:
++                    return None
++                if isinstance(obj, (classmethod, staticmethod)):
++                    return getattr(obj.__func__, '__doc__', None)
++                if isinstance(obj, property):
++                    # property.__doc__ returns fget.__doc__ (or None)
++                    return obj.__doc__
++                return getattr(obj, '__doc__', None)
++
++            # Determine whether we need to try to inherit a docstring for
++            # this attribute and where to write it.
++            try_inherit = False
++            set_target = None  # callable taking a docstring to set it
++
++            if inspect.isfunction(val):
++                if val.__doc__ is None:
++                    try_inherit = True
++                    set_target = lambda doc, v=val: setattr(v, '__doc__', doc)
++            elif isinstance(val, (classmethod, staticmethod)):
++                inner = val.__func__
++                if inner.__doc__ is None:
++                    try_inherit = True
++                    set_target = lambda doc, i=inner: setattr(i, '__doc__', doc)
++            elif isinstance(val, property):
++                # For property, try to set the property's __doc__ if possible,
++                # and also the fget's __doc__ as a fallback.
++                if val.__doc__ is None or (hasattr(val, 'fget') and getattr(val.fget, '__doc__', None) is None):
++                    try_inherit = True
++                    def _set_prop_doc(doc, p=val):
++                        # Try setting property.__doc__
++                        try:
++                            p.__doc__ = doc
++                        except Exception:
++                            pass
++                        # Also set fget.__doc__ if present and not set
++                        if hasattr(p, 'fget') and getattr(p.fget, '__doc__', None) is None:
++                            try:
++                                p.fget.__doc__ = doc
++                            except Exception:
++                                pass
++                    set_target = _set_prop_doc
++
++            if not try_inherit:
++                continue
++
++            # Walk the MRO to find the first base that defines the attribute
++            # in its __dict__ and has a docstring we can use.
++            for base in cls.__mro__[1:]:
++                base_obj = base.__dict__.get(key, None)
++                if base_obj is None:
++                    continue
++                source_doc = _get_doc_from_obj(base_obj)
++                if source_doc:
++                    # Found a docstring to inherit; set it on the target.
++                    set_target(source_doc)
++                    break
+
+         super().__init__(name, bases, dct)
+2025-11-26 13:28:50,173 - INFO - Eval script for astropy__astropy-7166 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/astropy__astropy-7166/eval.sh; copying to container...
+2025-11-26 13:29:01,723 - INFO - Test runtime: 11.44 seconds
+2025-11-26 13:29:01,723 - INFO - Test output for astropy__astropy-7166 written to logs/run_evaluation/my_evaluation_run/gpt-5-mini/astropy__astropy-7166/test_output.txt
+2025-11-26 13:29:01,801 - INFO - Git diff after:
+diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py
+index de3fb01d1..c6585e0e8 100644
+--- a/astropy/utils/misc.py
++++ b/astropy/utils/misc.py
+@@ -528,14 +528,68 @@ class InheritDocstrings(type):
+                 not key.startswith('_'))
+
+         for key, val in dct.items():
+-            if (inspect.isfunction(val) and
+-                is_public_member(key) and
+-                val.__doc__ is None):
+-                for base in cls.__mro__[1:]:
+-                    super_method = getattr(base, key, None)
+-                    if super_method is not None:
+-                        val.__doc__ = super_method.__doc__
+-                        break
++            if not is_public_member(key):
++                continue
++
++            # Helper to extract a docstring from an object that might be a
++            # function, classmethod, staticmethod, or property.
++            def _get_doc_from_obj(obj):
++                if obj is None:
++                    return None
++                if isinstance(obj, (classmethod, staticmethod)):
++                    return getattr(obj.__func__, '__doc__', None)
++                if isinstance(obj, property):
++                    # property.__doc__ returns fget.__doc__ (or None)
++                    return obj.__doc__
++                return getattr(obj, '__doc__', None)
++
++            # Determine whether we need to try to inherit a docstring for
++            # this attribute and where to write it.
++            try_inherit = False
++            set_target = None  # callable taking a docstring to set it
++
++            if inspect.isfunction(val):
++                if val.__doc__ is None:
++                    try_inherit = True
++                    set_target = lambda doc, v=val: setattr(v, '__doc__', doc)
++            elif isinstance(val, (classmethod, staticmethod)):
++                inner = val.__func__
++                if inner.__doc__ is None:
++                    try_inherit = True
++                    set_target = lambda doc, i=inner: setattr(i, '__doc__', doc)
++            elif isinstance(val, property):
++                # For property, try to set the property's __doc__ if possible,
++                # and also the fget's __doc__ as a fallback.
++                if val.__doc__ is None or (hasattr(val, 'fget') and getattr(val.fget, '__doc__', None) is None):
++                    try_inherit = True
++                    def _set_prop_doc(doc, p=val):
++                        # Try setting property.__doc__
++                        try:
++                            p.__doc__ = doc
++                        except Exception:
++                            pass
++                        # Also set fget.__doc__ if present and not set
++                        if hasattr(p, 'fget') and getattr(p.fget, '__doc__', None) is None:
++                            try:
++                                p.fget.__doc__ = doc
++                            except Exception:
++                                pass
++                    set_target = _set_prop_doc
++
++            if not try_inherit:
++                continue
++
++            # Walk the MRO to find the first base that defines the attribute
++            # in its __dict__ and has a docstring we can use.
++            for base in cls.__mro__[1:]:
++                base_obj = base.__dict__.get(key, None)
++                if base_obj is None:
++                    continue
++                source_doc = _get_doc_from_obj(base_obj)
++                if source_doc:
++                    # Found a docstring to inherit; set it on the target.
++                    set_target(source_doc)
++                    break
+
+         super().__init__(name, bases, dct)
+2025-11-26 13:29:01,801 - INFO - Grading answer for astropy__astropy-7166...
+2025-11-26 13:29:01,803 - INFO - report: {'astropy__astropy-7166': {'patch_is_None': False, 'patch_exists': True, 'patch_successfully_applied': True, 'resolved': True, 'tests_status': {'FAIL_TO_PASS': {'success': ['astropy/utils/tests/test_misc.py::test_inherit_docstrings'], 'failure': []}, 'PASS_TO_PASS': {'success': ['astropy/utils/tests/test_misc.py::test_isiterable', 'astropy/utils/tests/test_misc.py::test_signal_number_to_name_no_failure', 'astropy/utils/tests/test_misc.py::test_skip_hidden', 'astropy/utils/tests/test_misc.py::test_JsonCustomEncoder', 'astropy/utils/tests/test_misc.py::test_check_broadcast', 'astropy/utils/tests/test_misc.py::test_dtype_bytes_or_chars'], 'failure': []}, 'FAIL_TO_FAIL': {'success': [], 'failure': []}, 'PASS_TO_FAIL': {'success': [], 'failure': []}}}}
+Result for astropy__astropy-7166: resolved: True
+2025-11-26 13:29:01,803 - INFO - Attempting to stop container sweb.eval.astropy__astropy-7166.my_evaluation_run...
+2025-11-26 13:29:17,348 - INFO - Attempting to remove container sweb.eval.astropy__astropy-7166.my_evaluation_run...
+2025-11-26 13:29:17,410 - INFO - Container sweb.eval.astropy__astropy-7166.my_evaluation_run removed.

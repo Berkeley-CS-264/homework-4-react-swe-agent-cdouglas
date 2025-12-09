@@ -1,0 +1,12 @@
+diff --git a/django/contrib/staticfiles/management/commands/collectstatic.py b/django/contrib/staticfiles/management/commands/collectstatic.py
+index f7e069b20b..cfef3682d1 100644
+--- a/django/contrib/staticfiles/management/commands/collectstatic.py
++++ b/django/contrib/staticfiles/management/commands/collectstatic.py
+@@ -135,6 +135,7 @@ class Command(BaseCommand):
+                 if processed:
+                     self.log("Post-processed '%s' as '%s'" %
+                              (original_path, processed_path), level=2)
++                    if original_path not in self.post_processed_files:
+                     self.post_processed_files.append(original_path)
+                 else:
+                     self.log("Skipped post-processing '%s'" % original_path)

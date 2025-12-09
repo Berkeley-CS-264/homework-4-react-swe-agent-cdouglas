@@ -1,0 +1,27 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index d8cb75a5f..b8dce70c0 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -266,8 +266,20 @@ class GoogleDocstring:
+         if parse_type:
+             match = _google_typed_arg_regex.match(before)
+             if match:
+-                _name = match.group(1).strip()
+-                _type = match.group(2)
++                # The regex matches something like "name(type)" at the start.
++                # But there are two common forms:
++                # 1) "name(type)" -- the matched text equals the whole 'before'
++                # 2) "type(...) name" -- the matched parenthesized text appears
++                #    at the beginning, followed by the parameter name.
++                matched_text = match.group(0)
++                if matched_text.strip() == before.strip():
++                    # usual "name(type)" form
++                    _name = match.group(1).strip()
++                    _type = match.group(2)
++                else:
++                    # handle "type(...) name" form, e.g. "dict(str, str) opc_meta"
++                    _type = matched_text.strip()
++                    _name = before[len(matched_text):].strip()
+
+         _name = self._escape_args_and_kwargs(_name)
+

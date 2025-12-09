@@ -1,0 +1,25 @@
+diff --git a/django/views/generic/base.py b/django/views/generic/base.py
+index ea5baca08d..afc5eb12b0 100644
+--- a/django/views/generic/base.py
++++ b/django/views/generic/base.py
+@@ -159,11 +159,18 @@ class TemplateView(TemplateResponseMixin, ContextMixin, View):
+     def get(self, request, *args, **kwargs):
+         # RemovedInDjango40Warning: when the deprecation ends, replace with:
+         #   context = self.get_context_data()
+-        context_kwargs = _wrap_url_kwargs_with_deprecation_warning(kwargs)
+-        context = self.get_context_data(**context_kwargs)
++        # Pass concrete URL kwargs to get_context_data so code expecting real
++        # values (e.g. model lookups) works. Then, for backwards-compatibility
++        # with the deprecation behavior, insert SimpleLazyObject-wrapped URL
++        # kwargs into the final context so templates still trigger the
++        # RemovedInDjango40Warning when accessing those values.
++        context = self.get_context_data(**kwargs)
++        for key, value in _wrap_url_kwargs_with_deprecation_warning(kwargs).items():
++            context[key] = value
+         return self.render_to_response(context)
+
+
++
+ # RemovedInDjango40Warning
+ def _wrap_url_kwargs_with_deprecation_warning(url_kwargs):
+     context_kwargs = {}

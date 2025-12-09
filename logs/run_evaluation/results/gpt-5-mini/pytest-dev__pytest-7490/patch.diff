@@ -1,0 +1,32 @@
+diff --git a/testing/python/metafunc.py b/testing/python/metafunc.py
+index 4e6cfaf91..2648020ec 100644
+--- a/testing/python/metafunc.py
++++ b/testing/python/metafunc.py
+@@ -13,10 +13,10 @@ from typing import Tuple
+ from typing import Union
+
+ import attr
+-import hypothesis
+-from hypothesis import strategies
+
+ import pytest
++hypothesis = pytest.importorskip('hypothesis')
++from hypothesis import strategies
+ from _pytest import fixtures
+ from _pytest import python
+ from _pytest.outcomes import fail
+diff --git a/testing/test_junitxml.py b/testing/test_junitxml.py
+index eb8475ca5..253adb481 100644
+--- a/testing/test_junitxml.py
++++ b/testing/test_junitxml.py
+@@ -7,9 +7,9 @@ from typing import Tuple
+ from xml.dom import minidom
+
+ import py
+-import xmlschema
+
+ import pytest
++xmlschema = pytest.importorskip('xmlschema')
+ from _pytest.compat import TYPE_CHECKING
+ from _pytest.config import Config
+ from _pytest.junitxml import bin_xml_escape

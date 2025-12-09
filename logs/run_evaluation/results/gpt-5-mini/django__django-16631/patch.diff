@@ -1,0 +1,67 @@
+diff --git a/docs/ref/settings.txt b/docs/ref/settings.txt
+index 41387886c0..9a316f957e 100644
+--- a/docs/ref/settings.txt
++++ b/docs/ref/settings.txt
+@@ -2280,10 +2280,19 @@ The secret key is used for:
+   different key is provided.
+
+ When a secret key is no longer set as :setting:`SECRET_KEY` or contained within
+-:setting:`SECRET_KEY_FALLBACKS` all of the above will be invalidated. When
+-rotating your secret key, you should move the old key to
+-:setting:`SECRET_KEY_FALLBACKS` temporarily. Secret keys are not used for
+-passwords of users and key rotation will not affect them.
++:setting:`SECRET_KEY_FALLBACKS` all of the above will be invalidated with one
++important exception: the session auth hash (returned by
++:meth:`~django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash`) is
++derived using the current :setting:`SECRET_KEY` and does not consult
++:setting:`SECRET_KEY_FALLBACKS`. Rotating the active
++:setting:`SECRET_KEY` will therefore invalidate session authentication
++hashes and will log users out even if the old key is present in
++:setting:`SECRET_KEY_FALLBACKS`.
++
++When rotating your secret key, you should move the old key to
++:setting:`SECRET_KEY_FALLBACKS` temporarily to allow validation of signed
++data (for example signed cookies or password reset tokens). Secret keys
++are not used for user passwords and key rotation will not affect them.
+
+ .. note::
+
+@@ -2304,7 +2313,13 @@ used to allow rotation of the ``SECRET_KEY``.
+ In order to rotate your secret keys, set a new ``SECRET_KEY`` and move the
+ previous value to the beginning of ``SECRET_KEY_FALLBACKS``. Then remove the
+ old values from the end of the ``SECRET_KEY_FALLBACKS`` when you are ready to
+-expire the sessions, password reset tokens, and so on, that make use of them.
++expire signed data that was generated with those old keys (for example,
++password reset tokens or signed cookies). Note that the default
++:meth:`~django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash()`
++does not use :setting:`SECRET_KEY_FALLBACKS` — it is computed with the
++current ``SECRET_KEY`` only, so rotating ``SECRET_KEY`` will invalidate
++session authentication hashes and will log users out even if the old key is
++present in ``SECRET_KEY_FALLBACKS``.
+
+ .. note::
+
+diff --git a/docs/topics/auth/default.txt b/docs/topics/auth/default.txt
+index c705abcb6b..ff77d539ee 100644
+--- a/docs/topics/auth/default.txt
++++ b/docs/topics/auth/default.txt
+@@ -957,11 +957,15 @@ function.
+
+ .. note::
+
+-    Since
+     :meth:`~django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash()`
+-    is based on :setting:`SECRET_KEY`, secret key values must be
+-    rotated to avoid invalidating existing sessions when updating your site to
+-    use a new secret. See :setting:`SECRET_KEY_FALLBACKS` for details.
++    is based on :setting:`SECRET_KEY` and does not consult
++    :setting:`SECRET_KEY_FALLBACKS`. Rotating the active
++    :setting:`SECRET_KEY` will therefore invalidate existing session
++    authentication hashes (logging users out). :setting:`SECRET_KEY_FALLBACKS`
++    can be used to validate many kinds of signed data (for example, signed
++    cookies and password reset tokens) but it does not preserve session
++    authentication hashes produced by the default implementation of
++    :meth:`get_session_auth_hash()`.
+
+ .. _built-in-auth-views:
+

@@ -1,0 +1,31 @@
+diff --git a/sklearn/compose/_column_transformer.py b/sklearn/compose/_column_transformer.py
+index 4eddd12b1..d2351f2ba 100644
+--- a/sklearn/compose/_column_transformer.py
++++ b/sklearn/compose/_column_transformer.py
+@@ -293,14 +293,24 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+             Estimator instance.
+         """
+         super().set_output(transform=transform)
++        # Include the unfitted remainder estimator (if any) so that calling
++        # set_output before fit configures it as well. We add it as a single
++        # tuple to the chained iterables so it is treated like other transformers.
+         transformers = (
+             trans
+             for _, trans, _ in chain(
+-                self.transformers, getattr(self, "transformers_", [])
++                self.transformers,
++                getattr(self, "transformers_", []),
++                [("remainder", getattr(self, "remainder", None), None)],
+             )
+-            if trans not in {"passthrough", "drop"}
++            if trans not in {"passthrough", "drop", None}
+         )
++        # Avoid calling set_output multiple times on the same estimator object.
++        seen = set()
+         for trans in transformers:
++            if id(trans) in seen:
++                continue
++            seen.add(id(trans))
+             _safe_set_output(trans, transform=transform)
+
+         return self

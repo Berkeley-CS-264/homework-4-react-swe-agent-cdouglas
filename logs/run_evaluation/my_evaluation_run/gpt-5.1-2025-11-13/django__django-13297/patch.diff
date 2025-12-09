@@ -1,0 +1,14 @@
+diff --git a/django/views/generic/base.py b/django/views/generic/base.py
+index ea5baca08d..59f60e35ed 100644
+--- a/django/views/generic/base.py
++++ b/django/views/generic/base.py
+@@ -178,7 +178,10 @@ def _wrap_url_kwargs_with_deprecation_warning(url_kwargs):
+                 RemovedInDjango40Warning, stacklevel=2,
+             )
+             return value
+-        context_kwargs[key] = access_value
++        # Resolve the lazy object immediately so that URL kwargs used in
++        # filters, database lookups, etc. receive plain values (e.g. str),
++        # matching the behavior prior to Django 3.1.
++        context_kwargs[key] = access_value.__wrapped__()
+     return context_kwargs

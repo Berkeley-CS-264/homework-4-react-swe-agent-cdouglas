@@ -1,0 +1,40 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 87707d48f..e491e3efd 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -191,19 +191,29 @@ def _restify_py37(cls: Optional[Type]) -> str:
+         return text
+     elif isinstance(cls, typing._SpecialForm):
+         return ':py:obj:`~%s.%s`' % (cls.__module__, cls._name)
+-    elif hasattr(cls, '__qualname__'):
++    elif hasattr(cls, '__qualname__') or hasattr(cls, '__name__'):
++        # Some mocked or proxy objects may miss a usable __qualname__ or __name__.
++        # Fall back gracefully to other attributes or repr so we don't end up with
++        # something like 'torch.nn.' when the class name is empty.
++        name = getattr(cls, '__qualname__', None) or getattr(cls, '__name__', None)
++        if not name:
++            # try the type's name or repr as a last resort
++            name = getattr(type(cls), '__name__', None) or repr(cls)
++            if isinstance(name, str) and '.' in name:
++                name = name.split('.')[-1]
+         if cls.__module__ == 'typing':
+-            return ':py:class:`~%s.%s`' % (cls.__module__, cls.__qualname__)
++            return ':py:class:`~%s.%s`' % (cls.__module__, name)
+         else:
+-            return ':py:class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++            return ':py:class:`%s.%s`' % (cls.__module__, name)
+     elif isinstance(cls, ForwardRef):
+         return ':py:class:`%s`' % cls.__forward_arg__
+     else:
+-        # not a class (ex. TypeVar)
++        # not a class (ex. TypeVar) or missing name
++        name = getattr(cls, '__name__', None) or getattr(type(cls), '__name__', None) or repr(cls)
+         if cls.__module__ == 'typing':
+-            return ':py:obj:`~%s.%s`' % (cls.__module__, cls.__name__)
++            return ':py:obj:`~%s.%s`' % (cls.__module__, name)
+         else:
+-            return ':py:obj:`%s.%s`' % (cls.__module__, cls.__name__)
++            return ':py:obj:`%s.%s`' % (cls.__module__, name)
+
+
+ def _restify_py36(cls: Optional[Type]) -> str:

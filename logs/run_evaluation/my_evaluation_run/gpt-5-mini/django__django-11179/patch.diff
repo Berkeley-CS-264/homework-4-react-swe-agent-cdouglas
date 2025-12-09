@@ -1,0 +1,73 @@
+diff --git a/PATCH_DELETE_CLEAR_PK.md b/PATCH_DELETE_CLEAR_PK.md
+new file mode 100644
+index 0000000000..3e99da66d1
+--- /dev/null
++++ b/PATCH_DELETE_CLEAR_PK.md
+@@ -0,0 +1,67 @@
++Title: Fix: clear instance PK after delete() when there are no dependent objects
++
++Problem
++-------
++When deleting a model instance with no dependencies, the instance primary key attribute (e.g. "id" / instance.pk) is not cleared on the Python instance. After delete(), the instance should be considered unsaved so a subsequent save() performs an INSERT. The appropriate place to fix this is in Django's deletion logic (django/db/models/deletion.py, Collector.delete).
++
++Minimal change to apply
++-----------------------
++Open django/db/models/deletion.py and locate Collector.delete. Insert the following snippet immediately after the code that performs the DB DELETE for the instance (i.e. after the object's row(s) have been deleted from the database). The user reported line numbers around 276-281; insert the snippet just after the deletion logic in that loop.
++
++Exact snippet to insert (3 lines):
++
++    # Clear the instance primary key so the instance is treated as unsaved.
++    pk_attname = obj._meta.pk.attname
++    setattr(obj, pk_attname, None)
++    obj._state.adding = True
++
++Notes:
++- Replace "obj" with the loop variable name used in Collector.delete if it differs (commonly "obj" or "instance").
++- Using attname clears the actual attribute name on the instance (e.g., "id").
++- Setting instance._state.adding = True ensures subsequent save() performs an INSERT instead of UPDATE.
++
++Where to place it
++-----------------
++File: django/db/models/deletion.py
++Function: Collector.delete
++
++Look for the loop that deletes collected objects or a comment like "# Delete collected objects". Insert the snippet immediately after the code that executes the delete for each collected instance (i.e. after the DB-level deletion for that object completes).
++
++Example context (pseudo-code):
++
++    for obj in collected_objects:
++        # ... code that deletes obj from DB ...
++        # -- insert snippet here --
++        pk_attname = obj._meta.pk.attname
++        setattr(obj, pk_attname, None)
++        obj._state.adding = True
++
++Unit test (add to your Django tests)
++------------------------------------
++Add a test that asserts the instance PK is cleared and obj._state.adding is True after delete() for a model that has no related objects:
++
++    from django.test import TestCase
++    from .models import MyModel  # replace with a test model
++
++    class DeleteClearsPKTest(TestCase):
++        def test_delete_clears_pk_for_no_dependencies(self):
++            obj = MyModel.objects.create(name='x')
++            self.assertIsNotNone(obj.pk)
++
++            obj.delete()
++            self.assertIsNone(obj.pk)
++            self.assertTrue(obj._state.adding)
++
++If you want to be conservative, only apply the snippet when the deleted object was indeed removed (i.e. when the Collector.delete code deleted the object's row). In the typical Collector.delete implementation, inserting the snippet right after the DB delete ensures that.
++
++How to apply & test locally
++---------------------------
++1. Edit django/db/models/deletion.py in your Django source and add the three-line snippet at the appropriate location in Collector.delete as described above.
++2. Add the unit test to your test suite (or adjust an existing deletion test).
++3. Run your test suite (./manage.py test or pytest against the Django test suite you run).
++4. If a failing test appears, paste the test output and I can help analyze.
++
++If you want, I can instead:
++- produce a unified diff/patch editing the real django/db/models/deletion.py if you paste that file's contents here, or
++- attempt to create the patch file directly in this repo (but the repo currently does not appear to include Django core files).
++

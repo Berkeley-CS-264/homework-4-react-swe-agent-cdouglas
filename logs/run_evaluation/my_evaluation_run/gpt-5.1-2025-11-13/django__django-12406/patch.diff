@@ -1,0 +1,31 @@
+diff --git a/django/forms/models.py b/django/forms/models.py
+index dafc11f995..e97729450d 100644
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+@@ -176,13 +176,24 @@ def fields_for_model(model, fields=None, exclude=None, widgets=None,
+             raise TypeError('formfield_callback must be a function or callable')
+         else:
+             formfield = formfield_callback(f, **kwargs)
+-
+-        if formfield:
++if formfield:
++            from django.forms.widgets import RadioSelect
++            # For radio widgets on non-blank model fields, don't include the
++            # empty "---------" option. Radio buttons already support an
++            # unselected state, and an explicit blank choice is misleading.
++            if isinstance(formfield.widget, RadioSelect) and not getattr(f, 'blank', False):
++                if hasattr(formfield, 'empty_label'):
++                    formfield.empty_label = None
+             if apply_limit_choices_to:
+                 apply_limit_choices_to_to_formfield(formfield)
+             field_dict[f.name] = formfield
+         else:
+             ignored.append(f.name)
++----END_FUNCTION_CALL
++            ignored.append(f.name)
++----END_FUNCTION_CALL
++        else:
++            ignored.append(f.name)
+     if fields:
+         field_dict = {
+             f: field_dict.get(f) for f in fields

@@ -1,0 +1,38 @@
+diff --git a/django/views/generic/base.py b/django/views/generic/base.py
+index ea5baca08d..fddcd1d551 100644
+--- a/django/views/generic/base.py
++++ b/django/views/generic/base.py
+@@ -159,8 +159,31 @@ class TemplateView(TemplateResponseMixin, ContextMixin, View):
+     def get(self, request, *args, **kwargs):
+         # RemovedInDjango40Warning: when the deprecation ends, replace with:
+         #   context = self.get_context_data()
+-        context_kwargs = _wrap_url_kwargs_with_deprecation_warning(kwargs)
+-        context = self.get_context_data(**context_kwargs)
++        #
++        # Historically URL kwargs were wrapped in SimpleLazyObject and passed
++        # into get_context_data so that a deprecation warning could be issued
++        # when they were referenced in templates. Wrapping the values caused
++        # surprises when user code (for example, model lookups) accessed the
++        # kwargs in Python before rendering, as lazy objects may not be valid
++        # parameter types for other APIs (see ticket referencing SimpleLazyObject
++        # causing DB parameter binding errors).
++        #
++        # To avoid passing lazy proxies into user code, pass the original
++        # kwargs (concrete values) to get_context_data, and only insert lazy
++        # wrappers into the context that will be used for template rendering,
++        # and only for keys that were not already provided by get_context_data.
++        original_kwargs = kwargs
++        context = self.get_context_data(**original_kwargs)
++        # Ensure we have a mutable mapping to update with lazy wrappers.
++        try:
++            contains = context.__contains__
++        except Exception:
++            # Fallback: if context doesn't support __contains__, treat it as a dict.
++            contains = lambda k: k in context
++        lazy_kwargs = _wrap_url_kwargs_with_deprecation_warning(original_kwargs)
++        for key, value in lazy_kwargs.items():
++            if not contains(key):
++                context[key] = value
+         return self.render_to_response(context)
+
+

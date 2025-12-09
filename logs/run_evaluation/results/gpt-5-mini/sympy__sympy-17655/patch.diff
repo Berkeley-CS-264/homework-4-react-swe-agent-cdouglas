@@ -1,0 +1,47 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..b80e612da0 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -216,7 +216,26 @@ def __add__(self, other):
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
+-            raise GeometryError("Don't know how to add {} and a Point object".format(other))
++            # Handle scalar * Point which becomes a Mul (for example
++            # SymPy's Float.__mul__ returns a Mul rather than calling
++            # the point's __rmul__).  In that case, look for a Point
++            # inside the Mul and perform the multiplication using the
++            # Point.__mul__ logic so that 2*Point(...) behaves like
++            # Point(...)*2.
++            from sympy import Mul
++            if isinstance(other, Mul):
++                for a in other.args:
++                    if isinstance(a, Point):
++                        point_factor = a
++                        scalar_args = tuple(x for x in other.args if x is not a)
++                        scalar = Mul(*scalar_args) if scalar_args else S.One
++                        scaled_point = point_factor * scalar
++                        s, o = Point._normalize_dimension(self, Point(scaled_point, evaluate=False))
++                        break
++                else:
++                    raise GeometryError("Don't know how to add {} and a Point object".format(other))
++            else:
++                raise GeometryError("Don't know how to add {} and a Point object".format(other))
+
+         coords = [simplify(a + b) for a, b in zip(s, o)]
+         return Point(coords, evaluate=False)
+@@ -278,6 +297,14 @@ def __mul__(self, factor):
+         coords = [simplify(x*factor) for x in self.args]
+         return Point(coords, evaluate=False)
+
++    def __rmul__(self, factor):
++        """Reflected multiplication to support scalar * Point.
++
++        Delegate to __mul__ so that expressions like 2*Point(...) behave
++        the same as Point(...)*2.
++        """
++        return self.__mul__(factor)
++
+     def __neg__(self):
+         """Negate the point."""
+         coords = [-x for x in self.args]

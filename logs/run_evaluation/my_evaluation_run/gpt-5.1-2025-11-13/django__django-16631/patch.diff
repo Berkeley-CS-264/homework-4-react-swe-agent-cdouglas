@@ -1,0 +1,29 @@
+diff --git a/django/contrib/auth/base_user.py b/django/contrib/auth/base_user.py
+index 5ee30bf59c..e6efb26366 100644
+--- a/django/contrib/auth/base_user.py
++++ b/django/contrib/auth/base_user.py
+@@ -131,9 +131,15 @@ class AbstractBaseUser(models.Model):
+         """
+         return is_password_usable(self.password)
+
+-    def get_session_auth_hash(self):
++def get_session_auth_hash(self):
+         """
+         Return an HMAC of the password field.
++
++        SECRET_KEY_FALLBACKS are not taken into account here. Session
++        authentication hashes are tied to the current SECRET_KEY so that
++        rotating SECRET_KEY forces a logout of existing sessions. See
++        django.utils.crypto.salted_hmac() and SECRET_KEY_FALLBACKS
++        documentation for details.
+         """
+         key_salt = "django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash"
+         return salted_hmac(
+@@ -141,6 +147,7 @@ class AbstractBaseUser(models.Model):
+             self.password,
+             algorithm="sha256",
+         ).hexdigest()
++----END_FUNCTION_CALL
+
+     @classmethod
+     def get_email_field_name(cls):

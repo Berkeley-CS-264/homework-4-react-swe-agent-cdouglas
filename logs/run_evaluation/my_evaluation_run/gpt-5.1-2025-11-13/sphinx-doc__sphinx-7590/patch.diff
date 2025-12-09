@@ -1,0 +1,10 @@
+diff --git a/sphinx/domains/cpp.py b/sphinx/domains/cpp.py
+index fe52d881d..900d0121f 100644
+--- a/sphinx/domains/cpp.py
++++ b/sphinx/domains/cpp.py
+@@ -1,4 +1,5 @@
+-"""
++"""C++ domain."""
++----END_FUNCTION_CALL
+     sphinx.domains.cpp
+     ~~~~~~~~~~~~~~~~~~

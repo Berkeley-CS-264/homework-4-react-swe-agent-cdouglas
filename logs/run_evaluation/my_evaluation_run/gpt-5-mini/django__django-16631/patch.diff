@@ -1,0 +1,31 @@
+diff --git a/docs/ref/settings.txt b/docs/ref/settings.txt
+index 41387886c0..098600620b 100644
+--- a/docs/ref/settings.txt
++++ b/docs/ref/settings.txt
+@@ -2301,10 +2301,23 @@ Default: ``[]``
+ A list of fallback secret keys for a particular Django installation. These are
+ used to allow rotation of the ``SECRET_KEY``.
+
+-In order to rotate your secret keys, set a new ``SECRET_KEY`` and move the
+-previous value to the beginning of ``SECRET_KEY_FALLBACKS``. Then remove the
+-old values from the end of the ``SECRET_KEY_FALLBACKS`` when you are ready to
+-expire the sessions, password reset tokens, and so on, that make use of them.
++:setting:`SECRET_KEY_FALLBACKS` can be useful for Django features that
++explicitly accept or check additional secret keys when verifying signed
++values. For example, Django's signing framework (:mod:`django.core.signing`)
++accepts ``fallback_keys`` (defaults to :setting:`SECRET_KEY_FALLBACKS`), and
++:class:`~django.contrib.auth.tokens.PasswordResetTokenGenerator` checks the
++current ``SECRET_KEY`` and any configured ``SECRET_KEY_FALLBACKS`` when
++validating password reset tokens.
++
++Important: not all uses of the secret key consult ``SECRET_KEY_FALLBACKS``.
++Some code calls :func:`~django.utils.crypto.salted_hmac` without supplying an
++explicit ``secret`` argument; in that case ``salted_hmac`` uses
++:setting:`SECRET_KEY` directly and does not try fallback values. A notable
++example is :meth:`~django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash`,
++which does not pass a secret to :func:`salted_hmac` — consequently, rotating
++:setting:`SECRET_KEY` will invalidate existing session authentication hashes
++and thus user sessions unless you take an application-specific migration
++approach.
+
+ .. note::
