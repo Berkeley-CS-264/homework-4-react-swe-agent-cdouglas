@@ -30,74 +30,6 @@ class SWEEnvironment:
             lines = ["[truncated to last 300 lines] ..."] + lines[-300:]
         return "\n".join(lines)
 
-    def _enhance_test_output(self, output: str) -> str:
-        """
-        Iteration 8: Parse test output and add clear summary at the top.
-
-        Extracts test results (passed/failed counts) from pytest output and
-        prepends a clear summary to help the agent quickly understand test status.
-
-        Args:
-            output (str): Raw test output from pytest
-
-        Returns:
-            Enhanced output with summary prepended
-        """
-        if not output or not isinstance(output, str):
-            return output
-
-        # Parse pytest output for test counts
-        passed_count = 0
-        failed_count = 0
-        error_count = 0
-
-        lines = output.splitlines()
-        for line in lines:
-            line_lower = line.lower()
-
-            # Look for pytest summary line (e.g., "=== 3 passed, 1 failed in 2.3s ===")
-            if "passed" in line_lower or "failed" in line_lower:
-                # Try to extract numbers
-                import re
-                passed_match = re.search(r'(\d+)\s+passed', line_lower)
-                failed_match = re.search(r'(\d+)\s+failed', line_lower)
-                error_match = re.search(r'(\d+)\s+error', line_lower)
-
-                if passed_match:
-                    passed_count = max(passed_count, int(passed_match.group(1)))
-                if failed_match:
-                    failed_count = max(failed_count, int(failed_match.group(1)))
-                if error_match:
-                    error_count = max(error_count, int(error_match.group(1)))
-
-        # Build summary
-        total_tests = passed_count + failed_count + error_count
-        if total_tests == 0:
-            # No clear test summary found - return as-is
-            return output
-
-        # Create prominent summary header
-        summary_lines = ["=" * 60, "TEST RESULTS SUMMARY"]
-
-        if failed_count > 0 or error_count > 0:
-            summary_lines.append(f"❌ FAILED: {failed_count + error_count} test(s) failing")
-            summary_lines.append(f"   Passed: {passed_count}")
-            summary_lines.append(f"   Failed: {failed_count}")
-            if error_count > 0:
-                summary_lines.append(f"   Errors: {error_count}")
-            summary_lines.append("")
-            summary_lines.append("Action needed: Review failures below and fix the code.")
-        else:
-            summary_lines.append(f"✓ PASSED: All {passed_count} test(s) passing")
-            summary_lines.append("")
-            summary_lines.append("Great! Tests are passing. You can call finish() if done.")
-
-        summary_lines.append("=" * 60)
-        summary_lines.append("")
-
-        # Prepend summary to original output
-        return "\n".join(summary_lines) + output
-
 
     # -------------------- REQUIRED TOOLS --------------------
     def run_bash_cmd(self, command: str) -> str:
@@ -548,9 +480,7 @@ except Exception as e:
             if isinstance(output, dict):
                 output = output.get("output", "") or output.get("stdout", "")
 
-            # Iteration 8: Enhance test output with clear summary
-            normalized = self._normalize_output(output)
-            return self._enhance_test_output(normalized)
+            return self._normalize_output(output)
         except Exception as e:
             error_msg = str(e)
             # Provide helpful error message
@@ -582,9 +512,7 @@ except Exception as e:
                 output = self.env.execute(command)
                 if isinstance(output, dict):
                     output = output.get("output", "") or output.get("stdout", "")
-                # Iteration 8: Enhance test output with clear summary
-                normalized = self._normalize_output(output)
-                return self._enhance_test_output(normalized)
+                return self._normalize_output(output)
 
             if isinstance(test_path, list):
                 # Join multiple paths into a single pytest invocation

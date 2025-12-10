@@ -45,9 +45,6 @@ class ReactAgent:
         self.ran_tests_after_edit: bool = False
         self.saw_failing_test: bool = False
         self.last_test_had_failure: bool = False
-        # Iteration 8: Track steps since last test for test-driven nudges
-        self.steps_since_last_test: int = 0
-        self.steps_since_last_edit: int = 0
 
         # Set up the initial structure of the history
         # Create required root nodes and a user node (task)
@@ -247,24 +244,6 @@ class ReactAgent:
         
         # Main ReAct loop
         for step in range(max_steps):
-            # Iteration 8: Increment step counters for test-driven nudges
-            self.steps_since_last_test += 1
-            self.steps_since_last_edit += 1
-
-            # Iteration 8: Test-driven nudges
-            # After 20 steps without tests, remind to run tests
-            if self.steps_since_last_test == 20:
-                self.add_message(
-                    "user",
-                    "Reminder: You haven't run tests in 20 steps. Run run_relevant_tests() or run_test() to verify your changes."
-                )
-            # After edit, if no test run within 5 steps, warn
-            elif self.made_edit and self.steps_since_last_edit <= 5 and self.steps_since_last_test >= 5:
-                self.add_message(
-                    "user",
-                    "⚠ You made an edit but haven't run tests yet. Run tests to verify your changes work."
-                )
-
             # Build messages for LLM (must be list of dicts, not string)
             messages = self.get_messages_for_llm()
 
@@ -346,8 +325,6 @@ class ReactAgent:
                     if success:
                         self.made_edit = True
                         self.ran_tests_after_edit = False
-                        # Iteration 8: Reset edit counter
-                        self.steps_since_last_edit = 0
 
                         # Iteration 6: Automatic syntax checking for Python files
                         file_path = function_call["arguments"].get("file_path", "")
@@ -374,29 +351,7 @@ class ReactAgent:
                                 f"\n\nEdit complete. "
                                 f"Verify changes with show_file_snippet('{file_path}') before running tests."
                             )
-
-                            # Iteration 8: Smarter test recommendations after file edits
-                            # Extract module/package path and suggest relevant tests
-                            if file_path:
-                                # Try to extract a sensible test path recommendation
-                                test_suggestion = ""
-                                if "test_" in file_path or "/tests/" in file_path or "/test/" in file_path:
-                                    # They edited a test file - suggest running it
-                                    test_suggestion = f"Run: run_test(test_path='{file_path}')"
-                                elif file_path.endswith('.py'):
-                                    # Try to guess test file
-                                    base_path = file_path.replace('.py', '')
-                                    parts = base_path.split('/')
-                                    filename = parts[-1] if parts else base_path
-                                    test_suggestion = f"Run tests for this module. Try: run_test(test_path='test_{filename}') or run_relevant_tests()"
-                                else:
-                                    test_suggestion = "Run run_relevant_tests() to verify your changes"
-
-                                result = result + f"\n💡 Test suggestion: {test_suggestion}"
                 elif function_call["name"] in {"run_test", "run_relevant_tests"}:
-                    # Iteration 8: Reset test counter when tests are run
-                    self.steps_since_last_test = 0
-
                     has_failure = _has_test_failure(result)
                     self.last_test_had_failure = has_failure
                     if has_failure:
@@ -411,9 +366,6 @@ class ReactAgent:
                 elif function_call["name"] == "run_bash_cmd":
                     command = function_call["arguments"].get("command", "")
                     if _is_test_command(command):
-                        # Iteration 8: Reset test counter when tests are run via bash
-                        self.steps_since_last_test = 0
-
                         has_failure = _has_test_failure(result)
                         self.last_test_had_failure = has_failure
                         if has_failure:
