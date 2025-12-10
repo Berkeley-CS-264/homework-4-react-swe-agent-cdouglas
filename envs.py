@@ -831,6 +831,79 @@ except Exception as e:
         except Exception as e:
             raise ValueError(f"Error showing file snippet: {e}")
 
+    def preview_replace(self, file_path: str, from_line: int, to_line: int) -> str:
+        """
+        Preview what lines will be replaced without actually modifying the file.
+
+        This allows the agent to see exactly what content will be replaced before
+        making the actual edit with replace_in_file().
+
+        Args:
+            file_path (str): Path to the file
+            from_line (int): Starting line number (1-indexed, inclusive)
+            to_line (int): Ending line number (1-indexed, inclusive)
+
+        Returns:
+            The lines that would be replaced, with line numbers
+        """
+        try:
+            # Normalize file path
+            file_path = file_path.strip()
+            if not file_path:
+                raise ValueError("File path cannot be empty")
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+
+            # Normalize line numbers
+            from_line = max(1, int(from_line))
+            to_line = max(1, int(to_line))
+
+            # Auto-correct if to_line < from_line
+            if to_line < from_line:
+                from_line, to_line = to_line, from_line
+
+            # Show the lines that would be replaced
+            cmd = f"nl -ba '{file_path}' | sed -n '{from_line},{to_line}p'"
+            output = self.env.execute(cmd)
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            lines_count = to_line - from_line + 1
+            return (f"Preview: These {lines_count} lines would be replaced:\n\n"
+                   f"{output}\n\n"
+                   f"To replace these lines, call replace_in_file('{file_path}', {from_line}, {to_line}, '<new_content>')")
+        except Exception as e:
+            raise ValueError(f"Error previewing replacement: {e}")
+
+    def show_current_diff(self) -> str:
+        """
+        Show the current git diff of all changes made so far.
+
+        This helps the agent see what modifications have been made to the repository,
+        which is useful for verifying edits before calling finish().
+
+        Returns:
+            Git diff output showing all uncommitted changes
+        """
+        try:
+            # Get the diff of all changes (both staged and unstaged)
+            cmd = "git diff HEAD"
+            output = self.env.execute(cmd)
+            if isinstance(output, dict):
+                output = output.get("output", "") or output.get("stdout", "")
+
+            if not output or not output.strip():
+                return "No changes detected. No files have been modified yet."
+
+            # Truncate if too long (keep last 500 lines)
+            lines = output.split('\n')
+            if len(lines) > 500:
+                output = '\n'.join(['[Diff truncated to last 500 lines]'] + lines[-500:])
+
+            return f"Current git diff:\n\n{output}"
+        except Exception as e:
+            raise ValueError(f"Error showing diff: {e}")
+
 
 class DumbEnvironment:
     """

@@ -145,8 +145,8 @@ class ReactAgent:
         
         # Organize tools by category
         tool_categories = {
-            "Repository Information": ["get_repo_info", "git_status"],
-            "File Operations": ["show_file", "replace_in_file", "grep", "find_files", "show_code_structure", "show_file_snippet"],
+            "Repository Information": ["get_repo_info", "git_status", "show_current_diff"],
+            "File Operations": ["show_file", "replace_in_file", "preview_replace", "grep", "find_files", "show_code_structure", "show_file_snippet"],
             "Testing & Analysis": ["run_test", "run_relevant_tests", "analyze_test_failure", "find_test_file", "check_syntax"],
             "General": ["run_bash_cmd", "finish"],
         }

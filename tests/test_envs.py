@@ -656,6 +656,70 @@ class AnotherClass:
             self.assertIn("Temporary script file not found in container", result)
             self.assertIn("retry the replace_in_file() call", result)
 
+    def test_preview_replace(self):
+        """Test preview_replace() shows what lines would be replaced."""
+        # Mock the execute call to return numbered lines
+        with patch.object(self.env_wrapper.env, 'execute',
+                         return_value="     1\tdef foo():\n     2\t    pass\n     3\t    return 1"):
+            result = self.env_wrapper.preview_replace("test.py", 1, 3)
+            self.assertIn("Preview:", result)
+            self.assertIn("3 lines would be replaced", result)
+            self.assertIn("def foo():", result)
+            self.assertIn("replace_in_file('test.py', 1, 3", result)
+
+    def test_preview_replace_normalizes_path(self):
+        """Test preview_replace() normalizes file paths."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         return_value="     1\ttest line"):
+            result = self.env_wrapper.preview_replace("./test.py", 1, 1)
+            self.assertIn("Preview:", result)
+            # Should work without error
+
+    def test_preview_replace_auto_corrects_line_order(self):
+        """Test preview_replace() auto-corrects if to_line < from_line."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         return_value="     1\tline 1\n     2\tline 2"):
+            result = self.env_wrapper.preview_replace("test.py", 2, 1)
+            # Should auto-correct to (1, 2) instead of (2, 1)
+            self.assertIn("2 lines would be replaced", result)
+
+    def test_show_current_diff(self):
+        """Test show_current_diff() shows git diff output."""
+        diff_output = """diff --git a/test.py b/test.py
+index 1234567..abcdefg 100644
+--- a/test.py
++++ b/test.py
+@@ -1,3 +1,3 @@
+ def foo():
+-    pass
++    return 1"""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         return_value=diff_output):
+            result = self.env_wrapper.show_current_diff()
+            self.assertIn("Current git diff:", result)
+            self.assertIn("diff --git", result)
+            self.assertIn("return 1", result)
+
+    def test_show_current_diff_no_changes(self):
+        """Test show_current_diff() when there are no changes."""
+        with patch.object(self.env_wrapper.env, 'execute',
+                         return_value=""):
+            result = self.env_wrapper.show_current_diff()
+            self.assertIn("No changes detected", result)
+            self.assertIn("No files have been modified", result)
+
+    def test_show_current_diff_truncates_long_output(self):
+        """Test show_current_diff() truncates very long diffs."""
+        # Create a diff with 600 lines
+        long_diff = "\n".join([f"line {i}" for i in range(600)])
+        with patch.object(self.env_wrapper.env, 'execute',
+                         return_value=long_diff):
+            result = self.env_wrapper.show_current_diff()
+            lines = result.split('\n')
+            # Should be truncated to around 500 lines + header
+            self.assertLess(len(lines), 520)  # 500 + some header
+            self.assertIn("truncated", result.lower())
+
 
 
 if __name__ == '__main__':

@@ -95,6 +95,8 @@ def process_instance(
             env.show_file_snippet,
             env.analyze_test_failure,
             env.show_code_structure,
+            env.preview_replace,
+            env.show_current_diff,
         ])
 
         # Run the agent
