@@ -18,6 +18,7 @@
 | 5 | Restored some complex tools | 40% | 8/20 | No change |
 | 6 | **Auto syntax check + edit size limits** | **50%** | **10/20** | **+25% improvement** ✅ |
 | 7 | Preview & diff inspection tools | 50% | 10/20 | Maintained ✓ |
+| 8 | Enhanced test output + test nudges | 45% | 9/20 | **-10% regression** ❌ |
 
 ## Consistently Resolved Instances (8/20)
 
