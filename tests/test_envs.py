@@ -720,6 +720,58 @@ index 1234567..abcdefg 100644
             self.assertLess(len(lines), 520)  # 500 + some header
             self.assertIn("truncated", result.lower())
 
+    # Iteration 8: Test enhanced test output
+    def test_enhance_test_output_with_failures(self):
+        """Test _enhance_test_output() adds summary for failing tests."""
+        pytest_output = """
+test_foo.py::test_bar FAILED
+test_foo.py::test_baz PASSED
+
+=== 1 passed, 1 failed in 2.3s ===
+"""
+        result = self.env_wrapper._enhance_test_output(pytest_output)
+        self.assertIn("TEST RESULTS SUMMARY", result)
+        self.assertIn("FAILED: 1 test(s) failing", result)
+        self.assertIn("Passed: 1", result)
+        self.assertIn("Failed: 1", result)
+        self.assertIn("Action needed", result)
+
+    def test_enhance_test_output_all_passing(self):
+        """Test _enhance_test_output() adds summary for passing tests."""
+        pytest_output = """
+test_foo.py::test_bar PASSED
+test_foo.py::test_baz PASSED
+
+=== 2 passed in 1.5s ===
+"""
+        result = self.env_wrapper._enhance_test_output(pytest_output)
+        self.assertIn("TEST RESULTS SUMMARY", result)
+        self.assertIn("PASSED: All 2 test(s) passing", result)
+        self.assertIn("finish()", result)
+
+    def test_enhance_test_output_with_errors(self):
+        """Test _enhance_test_output() handles test errors."""
+        pytest_output = """
+test_foo.py::test_bar ERROR
+test_foo.py::test_baz PASSED
+
+=== 1 passed, 1 error in 2.0s ===
+"""
+        result = self.env_wrapper._enhance_test_output(pytest_output)
+        self.assertIn("TEST RESULTS SUMMARY", result)
+        self.assertIn("FAILED: 1 test(s) failing", result)
+        self.assertIn("Errors: 1", result)
+
+    def test_enhance_test_output_no_summary(self):
+        """Test _enhance_test_output() returns as-is if no test summary found."""
+        output = "Some random output without test results"
+        result = self.env_wrapper._enhance_test_output(output)
+        self.assertEqual(output, result)
+
+    def test_enhance_test_output_none_input(self):
+        """Test _enhance_test_output() handles None input."""
+        result = self.env_wrapper._enhance_test_output(None)
+        self.assertIsNone(result)
 
 
 if __name__ == '__main__':
