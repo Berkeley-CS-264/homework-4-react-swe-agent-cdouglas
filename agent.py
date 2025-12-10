@@ -325,6 +325,32 @@ class ReactAgent:
                     if success:
                         self.made_edit = True
                         self.ran_tests_after_edit = False
+
+                        # Iteration 6: Automatic syntax checking for Python files
+                        file_path = function_call["arguments"].get("file_path", "")
+                        if file_path and file_path.strip().endswith('.py'):
+                            # Automatically check syntax after editing Python files
+                            if "check_syntax" in self.function_map:
+                                try:
+                                    syntax_result = self.function_map["check_syntax"](file_path=file_path)
+                                    if syntax_result and "Syntax OK" not in syntax_result:
+                                        # Syntax error detected - add warning to result
+                                        result = result + (
+                                            f"\n\n⚠ SYNTAX ERROR DETECTED in {file_path}:\n"
+                                            f"{syntax_result}\n"
+                                            f"You must fix this syntax error before proceeding. "
+                                            f"Use show_file_snippet() to view the problematic section and replace_in_file() to fix it."
+                                        )
+                                except Exception as e:
+                                    # Don't fail if syntax check fails - just log it
+                                    pass
+
+                        # Iteration 6: Post-edit verification prompt
+                        if "⚠ SYNTAX ERROR" not in result:
+                            result = result + (
+                                f"\n\nEdit complete. "
+                                f"Verify changes with show_file_snippet('{file_path}') before running tests."
+                            )
                 elif function_call["name"] in {"run_test", "run_relevant_tests"}:
                     has_failure = _has_test_failure(result)
                     self.last_test_had_failure = has_failure

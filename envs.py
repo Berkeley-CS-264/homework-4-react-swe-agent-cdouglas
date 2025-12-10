@@ -222,6 +222,14 @@ class SWEEnvironment:
                 lines_being_replaced = to_line - from_line + 1
                 new_content_lines = len(content.splitlines()) if content.strip() else 0
 
+                # Iteration 6: Warn if replacing >50 lines (absolute)
+                if lines_being_replaced > 50:
+                    return (f"Warning: Large edit detected ({lines_being_replaced} lines). "
+                           f"Consider smaller, targeted changes. "
+                           f"Edits larger than 50 lines are error-prone. "
+                           f"Use show_file_snippet() to identify the specific function/class to edit, "
+                           f"then replace only that section.")
+
                 # Validation 1: Warn if replacing >50% of a file with very little content
                 if file_line_count > 20:  # Only check for files with substantial content
                     replace_percentage = (lines_being_replaced / file_line_count) * 100
