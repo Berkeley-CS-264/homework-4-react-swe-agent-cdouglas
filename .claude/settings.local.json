@@ -24,7 +24,8 @@
       "Bash(then cp results_analysis.md run_results/0_40/)",
       "Bash(else echo \"No analysis file found - run analyze_results.py to create it\")",
       "Bash(python calculate_accuracy.py:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
